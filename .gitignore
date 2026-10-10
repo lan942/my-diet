@@ -25,3 +25,4 @@ ios/.symlinks/plugins
 ios/DerivedData
 ios/*.xcworkspace
 ios/*.xcodeproj
+*.apk
