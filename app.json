@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "my-diet",
+    "slug": "my-diet",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.zhongchaojun.mydiet"
+    },
+    "android": {
+      "package": "com.zhongchaojun.mydiet",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE"
+      }
+    },
+    "web": {},
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "buildArchs": ["arm64-v8a"]
+          }
+        }
+      ]
+    ]
+  }
+}

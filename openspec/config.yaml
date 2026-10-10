@@ -1,0 +1,15 @@
+schema: spec-driven
+
+# Project context (shown to AI when creating artifacts)
+context: |
+  Tech stack: React Native + Expo SDK 57, TypeScript 6
+  Local persistence: expo-sqlite (WAL mode, schema DDL, 幂等建表)
+  Navigation: @react-navigation/bottom-tabs (底部 Tab 导航)
+  State: React Context (全局 config + 数据列表 + refresh)
+  Layered: types.ts -> db(schema/database) -> services(CRUD+校验) -> screens -> App
+  Theme: 浅色主题，colors/spacing 集中定义
+  Testing: vitest
+  参考项目: d:\my-fin-app（金融记账 app，同类架构，本 diet app 复用其分层与样式风格）
+  Domain: 个人饮食/营养记录 app
+  Conventions: 中文 UI 文案；服务层抛出业务 Error 子类；时间用本地 YYYY-MM-DD HH:mm:ss；金额/数值非负校验
+  交付物: 本地 Git 仓库；APK 通过微信传文件传输到手机测试
