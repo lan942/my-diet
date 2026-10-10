@@ -40,12 +40,23 @@ interface AppContextValue {
 
 const AppContext = createContext<AppContextValue | null>(null);
 
+// 种子数据只在 App 生命周期内初始化一次
+let seedReadyPromise: Promise<void> | null = null;
+
+function ensureSeedsOnce(): Promise<void> {
+  if (!seedReadyPromise) {
+    seedReadyPromise = (async () => {
+      await ensureSeedCategories();
+      await ensureSeedFoods();
+    })();
+  }
+  return seedReadyPromise;
+}
+
 async function bootstrappedLoad(
   date: string
 ): Promise<[AppConfig, WeightRecord[], FoodCategory[], FoodItem[], IntakeLog[], StepLog[]]> {
-  // 确保种子数据存在（幂等）
-  await ensureSeedCategories();
-  await ensureSeedFoods();
+  await ensureSeedsOnce();
 
   const [cfg, w, cats, items, intake, steps] = await Promise.all([
     loadConfig(),

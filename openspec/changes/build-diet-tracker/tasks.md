@@ -47,6 +47,6 @@
 
 ## 8. 构建与交付
 
-- [ ] 8.1 `eas.json` 与 android 构建配置，本地 `expo prebuild` + 出 APK
+- [x] 8.1 `eas.json` 与 android 构建配置，本地 `expo prebuild` + 出 APK（debug APK 53.4MB）
 - [ ] 8.2 通过微信传文件将 APK 传输到手机安装测试
 - [ ] 8.3 验证四项核心功能在真机可跑，Git 提交最终代码
