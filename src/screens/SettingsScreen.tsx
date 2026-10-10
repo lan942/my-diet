@@ -7,6 +7,7 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
+  Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -16,6 +17,22 @@ import { colors, spacing } from '../theme';
 import { useApp } from '../state/AppContext';
 import { saveConfig } from '../services/configStore';
 import type { AppConfig } from '../types';
+
+interface RatioPreset {
+  label: string;
+  desc: string;
+  carb: number;
+  protein: number;
+  fat: number;
+}
+
+const PRESETS: RatioPreset[] = [
+  { label: '均衡', desc: '有运动，日常健康', carb: 0.5, protein: 0.25, fat: 0.25 },
+  { label: '减脂', desc: '低碳高蛋白', carb: 0.35, protein: 0.3, fat: 0.35 },
+  { label: '增肌', desc: '高碳水供能', carb: 0.55, protein: 0.28, fat: 0.17 },
+  { label: '控糖', desc: '低 GI 友好', carb: 0.4, protein: 0.3, fat: 0.3 },
+  { label: '生酮', desc: '极低碳水', carb: 0.08, protein: 0.22, fat: 0.7 },
+];
 
 export default function SettingsScreen() {
   const { config, refresh } = useApp();
@@ -54,6 +71,23 @@ export default function SettingsScreen() {
 
   const ratioSum = Number(carbRatio) + Number(proteinRatio) + Number(fatRatio);
 
+  function applyPreset(p: RatioPreset) {
+    setCarbRatio(String(p.carb));
+    setProteinRatio(String(p.protein));
+    setFatRatio(String(p.fat));
+  }
+
+  function ratioApproxEqual(a: number, b: number) {
+    return Math.abs(a - b) < 0.001;
+  }
+
+  const activePreset = PRESETS.find(
+    (p) =>
+      ratioApproxEqual(p.carb, Number(carbRatio)) &&
+      ratioApproxEqual(p.protein, Number(proteinRatio)) &&
+      ratioApproxEqual(p.fat, Number(fatRatio))
+  );
+
   return (
     <SafeAreaView edges={['bottom']} style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -79,6 +113,34 @@ export default function SettingsScreen() {
 
         <Card>
           <Text style={styles.cardTitle}>宏量比例（总和必须等于 1）</Text>
+          <Text style={styles.presetLabel}>快速预设</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.presetRow}
+          >
+            {PRESETS.map((p) => {
+              const isActive = activePreset?.label === p.label;
+              return (
+                <Pressable
+                  key={p.label}
+                  style={[styles.presetChip, isActive && styles.presetChipActive]}
+                  onPress={() => applyPreset(p)}
+                >
+                  <Text style={[styles.presetLabelText, isActive && styles.presetLabelTextActive]}>
+                    {p.label}
+                  </Text>
+                  <Text style={[styles.presetDescText, isActive && styles.presetDescTextActive]}>
+                    {p.desc}
+                  </Text>
+                  <Text style={[styles.presetRatioText, isActive && styles.presetLabelTextActive]}>
+                    {Math.round(p.carb * 100)}/{Math.round(p.protein * 100)}/{Math.round(p.fat * 100)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+          <Text style={styles.divider}>— 或手动调整 —</Text>
           <TextField
             label="碳水比例"
             value={carbRatio}
@@ -146,5 +208,56 @@ const styles = StyleSheet.create({
   },
   ratioHintError: {
     color: colors.sell,
+  },
+  presetLabel: {
+    fontSize: 13,
+    color: colors.muted,
+    marginBottom: spacing.sm,
+  },
+  presetRow: {
+    paddingVertical: spacing.xs,
+    gap: spacing.sm,
+  },
+  presetChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 10,
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.line,
+    marginRight: spacing.sm,
+    minWidth: 100,
+  },
+  presetChipActive: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  presetLabelText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  presetLabelTextActive: {
+    color: '#ffffff',
+  },
+  presetDescText: {
+    fontSize: 11,
+    color: colors.muted,
+    marginTop: 2,
+  },
+  presetDescTextActive: {
+    color: '#e0e7ff',
+  },
+  presetRatioText: {
+    fontSize: 12,
+    color: colors.muted,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  divider: {
+    fontSize: 12,
+    color: colors.muted,
+    textAlign: 'center',
+    marginVertical: spacing.md,
   },
 });
