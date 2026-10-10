@@ -10,7 +10,7 @@ import {
 } from 'react';
 import type { ReactNode } from 'react';
 
-import { loadConfig } from '../services/configStore';
+import { loadConfig, saveConfig } from '../services/configStore';
 import { listWeights } from '../services/weightService';
 import { listCategories, listFoodItems, ensureSeedCategories, ensureSeedFoods } from '../services/foodService';
 import { listIntake } from '../services/intakeService';
@@ -35,6 +35,7 @@ interface AppContextValue {
   currentDate: string;
   loading: boolean;
   refresh: () => Promise<void>;
+  saveAndRefreshConfig: (cfg: AppConfig) => Promise<void>;
   setCurrentDate: (date: string) => void;
 }
 
@@ -99,6 +100,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setCurrentDateState(date);
   }, []);
 
+  const saveAndRefreshConfig = useCallback(async (cfg: AppConfig) => {
+    await saveConfig(cfg);
+    await refresh();
+  }, [refresh]);
+
   useEffect(() => {
     let cancelled = false;
     bootstrappedLoad(currentDate)
@@ -131,6 +137,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       currentDate,
       loading,
       refresh,
+      saveAndRefreshConfig,
       setCurrentDate,
     }),
     [
@@ -143,6 +150,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       currentDate,
       loading,
       refresh,
+      saveAndRefreshConfig,
       setCurrentDate,
     ]
   );

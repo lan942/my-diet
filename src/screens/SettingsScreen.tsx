@@ -15,7 +15,6 @@ import Card from '../components/Card';
 import { Button, TextField } from '../components/ui';
 import { colors, spacing } from '../theme';
 import { useApp } from '../state/AppContext';
-import { saveConfig } from '../services/configStore';
 import type { AppConfig } from '../types';
 
 interface RatioPreset {
@@ -35,7 +34,7 @@ const PRESETS: RatioPreset[] = [
 ];
 
 export default function SettingsScreen() {
-  const { config, refresh } = useApp();
+  const { config, saveAndRefreshConfig } = useApp();
   const [kcalPerKg, setKcalPerKg] = useState('');
   const [proteinPerKg, setProteinPerKg] = useState('');
   const [carbRatio, setCarbRatio] = useState('');
@@ -61,9 +60,8 @@ export default function SettingsScreen() {
       fat_ratio: Number(fatRatio),
     };
     try {
-      await saveConfig(cfg);
-      await refresh();
-      Alert.alert('保存成功', '配置已更新');
+      await saveAndRefreshConfig(cfg);
+      Alert.alert('保存成功', '配置已更新，其他页面数据已联动刷新');
     } catch (e: any) {
       Alert.alert('错误', e?.message ?? '保存失败');
     }
@@ -71,10 +69,23 @@ export default function SettingsScreen() {
 
   const ratioSum = Number(carbRatio) + Number(proteinRatio) + Number(fatRatio);
 
-  function applyPreset(p: RatioPreset) {
+  async function applyPreset(p: RatioPreset) {
     setCarbRatio(String(p.carb));
     setProteinRatio(String(p.protein));
     setFatRatio(String(p.fat));
+    // 立即保存并刷新全局 config，让其他 Tab 联动更新
+    if (config) {
+      try {
+        await saveAndRefreshConfig({
+          ...config,
+          carb_ratio: p.carb,
+          protein_ratio: p.protein,
+          fat_ratio: p.fat,
+        });
+      } catch (e: any) {
+        Alert.alert('预设应用失败', e?.message ?? '请手动检查比例');
+      }
+    }
   }
 
   function ratioApproxEqual(a: number, b: number) {
