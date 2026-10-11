@@ -1,4 +1,4 @@
-// 应用入口：4 底部 Tab
+// 应用入口：首启引导门控 + 4 底部 Tab
 
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -7,14 +7,16 @@ import {
 } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
-import { Text } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { AppProvider } from './src/state/AppContext';
+import { AppProvider, useApp } from './src/state/AppContext';
 import { colors } from './src/theme';
 import ProfileScreen from './src/screens/ProfileScreen';
 import FoodLibraryScreen from './src/screens/FoodLibraryScreen';
 import IntakeScreen from './src/screens/IntakeScreen';
 import StepScreen from './src/screens/StepScreen';
+import OnboardingScreen from './src/screens/OnboardingScreen';
 
 export type RootTabParamList = {
   我的: undefined;
@@ -71,13 +73,32 @@ function RootTabs() {
   );
 }
 
+function Root() {
+  const { config, loading } = useApp();
+  if (loading || !config) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg }}>
+        <ActivityIndicator size="large" color={colors.accent} />
+        <Text style={{ marginTop: 12, fontSize: 14, color: colors.muted }}>加载中…</Text>
+      </View>
+    );
+  }
+  // 首启引导：未完成引导（onboarded=false）时展示向导
+  if (!config.onboarded) {
+    return <OnboardingScreen />;
+  }
+  return <RootTabs />;
+}
+
 export default function App() {
   return (
     <AppProvider>
-      <NavigationContainer theme={DefaultTheme}>
-        <StatusBar style="auto" />
-        <RootTabs />
-      </NavigationContainer>
+      <SafeAreaProvider>
+        <NavigationContainer theme={DefaultTheme}>
+          <StatusBar style="auto" />
+          <Root />
+        </NavigationContainer>
+      </SafeAreaProvider>
     </AppProvider>
   );
 }

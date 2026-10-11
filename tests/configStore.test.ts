@@ -34,6 +34,8 @@ describe('configStore.validateConfig', () => {
       carb_ratio: 0.4,
       protein_ratio: 0.3,
       fat_ratio: 0.3,
+      onboarded: true,
+      unit_system: 'metric',
     };
     expect(() => validateConfig(cfg)).not.toThrow();
   });
@@ -42,6 +44,12 @@ describe('configStore.validateConfig', () => {
     expect(() =>
       validateConfig({ ...DEFAULT_CONFIG, gender: 'other' as never })
     ).toThrow(ConfigError);
+  });
+
+  it('三值性别均可通过校验（男/女/不选）', () => {
+    for (const g of ['male', 'female', 'unknown'] as const) {
+      expect(() => validateConfig({ ...DEFAULT_CONFIG, gender: g })).not.toThrow();
+    }
   });
 
   it('拒绝年龄越界（0 / 121 / NaN）', () => {
@@ -101,6 +109,21 @@ describe('configStore.normalizeConfig', () => {
 
   it('全空输入返回默认配置', () => {
     expect(normalizeConfig(null)).toEqual(DEFAULT_CONFIG);
+  });
+
+  it('onboarded 缺失为 false，true 保留；unit_system 缺失/非法回退 metric', () => {
+    const cfg = normalizeConfig({ onboarded: true, unit_system: 'us' });
+    expect(cfg.onboarded).toBe(true);
+    expect(cfg.unit_system).toBe('us');
+    const fallback = normalizeConfig({ unit_system: 'imperial' as never });
+    expect(fallback.onboarded).toBe(false);
+    expect(fallback.unit_system).toBe('metric');
+  });
+
+  it('非法 gender 回退 unknown（unknown 本身合法保留）', () => {
+    expect(normalizeConfig({ gender: 'other' as never }).gender).toBe('unknown');
+    expect(normalizeConfig({ gender: 'unknown' }).gender).toBe('unknown');
+    expect(normalizeConfig({ gender: 'female' }).gender).toBe('female');
   });
 });
 

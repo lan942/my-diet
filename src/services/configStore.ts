@@ -7,7 +7,7 @@ import { ACTIVITY_LEVELS } from './targetService';
 export class ConfigError extends Error {}
 
 export const DEFAULT_CONFIG: AppConfig = {
-  gender: 'male',
+  gender: 'unknown',
   age: 30,
   height_cm: 170,
   weight_kg: 70,
@@ -15,13 +15,15 @@ export const DEFAULT_CONFIG: AppConfig = {
   carb_ratio: 0.45,
   protein_ratio: 0.3,
   fat_ratio: 0.25,
+  onboarded: false,
+  unit_system: 'metric',
 };
 
 const ACTIVITY_FACTORS = ACTIVITY_LEVELS.map((l) => l.factor);
 
 export function validateConfig(cfg: AppConfig): void {
-  if (cfg.gender !== 'male' && cfg.gender !== 'female') {
-    throw new ConfigError('性别必须为男或女');
+  if (cfg.gender !== 'male' && cfg.gender !== 'female' && cfg.gender !== 'unknown') {
+    throw new ConfigError('性别必须为男、女或不选');
   }
   if (!Number.isFinite(cfg.age) || cfg.age < 1 || cfg.age > 120) {
     throw new ConfigError('年龄必须在 1~120 之间');
@@ -41,10 +43,11 @@ export function validateConfig(cfg: AppConfig): void {
   }
 }
 
-// 旧配置归一化：缺失字段补默认值，废弃字段（kcal_per_kg/protein_per_kg）丢弃，比例字段保留
+// 旧配置归一化：缺失字段补默认值，废弃字段（kcal_per_kg/protein_per_kg）丢弃，比例字段保留；
+// onboarded 缺失视为未完成引导，unit_system 缺失/非法回退公制
 export function normalizeConfig(raw: Partial<AppConfig> | null): AppConfig {
   const merged: AppConfig = {
-    gender: (raw?.gender === 'female' || raw?.gender === 'male'
+    gender: (raw?.gender === 'female' || raw?.gender === 'male' || raw?.gender === 'unknown'
       ? raw.gender
       : DEFAULT_CONFIG.gender) as Gender,
     age: Number.isFinite(Number(raw?.age)) ? Number(raw?.age) : DEFAULT_CONFIG.age,
@@ -66,6 +69,8 @@ export function normalizeConfig(raw: Partial<AppConfig> | null): AppConfig {
     fat_ratio: Number.isFinite(Number(raw?.fat_ratio))
       ? Number(raw?.fat_ratio)
       : DEFAULT_CONFIG.fat_ratio,
+    onboarded: raw?.onboarded === true,
+    unit_system: raw?.unit_system === 'us' ? 'us' : DEFAULT_CONFIG.unit_system,
   };
   return merged;
 }

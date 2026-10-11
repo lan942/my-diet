@@ -198,7 +198,7 @@ export default function FoodLibraryScreen() {
                       <Ionicons name="create-outline" size={18} color={colors.accent} />
                     </Pressable>
                     <Pressable onPress={() => handleDelete(item)} hitSlop={8}>
-                      <Ionicons name="trash-outline" size={18} color={colors.sell} />
+                      <Ionicons name="trash-outline" size={18} color={colors.danger} />
                     </Pressable>
                   </View>
                 }

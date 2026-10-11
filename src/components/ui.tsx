@@ -27,7 +27,7 @@ export function Button({
     variant === 'primary'
       ? colors.accent
       : variant === 'danger'
-        ? colors.sell
+        ? colors.danger
         : 'transparent';
   const textColor =
     variant === 'ghost' ? colors.accent : '#ffffff';

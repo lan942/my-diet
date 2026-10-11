@@ -2,7 +2,7 @@
   "expo": {
     "name": "my-diet",
     "slug": "my-diet",
-    "version": "1.3.1",
+    "version": "1.4.6",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "light",
@@ -18,7 +18,7 @@
     },
     "android": {
       "package": "com.zhongchaojun.mydiet",
-      "versionCode": 6,
+      "versionCode": 13,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#A8E6C9"

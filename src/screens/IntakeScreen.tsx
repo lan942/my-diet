@@ -224,7 +224,7 @@ export default function IntakeScreen() {
                   }
                   right={
                     <Pressable onPress={() => handleDelete(l.id)} hitSlop={8}>
-                      <Ionicons name="trash-outline" size={18} color={colors.sell} />
+                      <Ionicons name="trash-outline" size={18} color={colors.danger} />
                     </Pressable>
                   }
                 />

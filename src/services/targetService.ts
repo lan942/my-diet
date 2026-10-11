@@ -22,7 +22,23 @@ export const ACTIVITY_LEVELS: ActivityLevel[] = [
   { factor: 1.9, label: '极高强度', desc: '职业运动员/重体力劳动者' },
 ];
 
-// Mifflin-St Jeor 公式
+// 核心目标模板：引导第 1 步与「我的」预设共用（蛋白/脂肪/碳水）
+export interface GoalPreset {
+  label: string;
+  desc: string;
+  color: string;
+  protein: number;
+  fat: number;
+  carb: number;
+}
+
+export const GOAL_PRESETS: GoalPreset[] = [
+  { label: '减脂', desc: '热量缺口，燃脂优先', color: '#FF6B4A', protein: 0.3, fat: 0.25, carb: 0.45 },
+  { label: '维持体重', desc: '均衡摄入，稳住现状', color: '#10B981', protein: 0.25, fat: 0.25, carb: 0.5 },
+  { label: '增肌', desc: '碳水充能，支持训练', color: '#6366F1', protein: 0.25, fat: 0.2, carb: 0.55 },
+];
+
+// Mifflin-St Jeor 公式：男末项 +5，女 −161，未选性别（unknown）−78（两者中点）
 export function computeBmr(
   gender: Gender,
   weightKg: number,
@@ -30,7 +46,9 @@ export function computeBmr(
   age: number
 ): number {
   const base = 10 * weightKg + 6.25 * heightCm - 5 * age;
-  return gender === 'male' ? base + 5 : base - 161;
+  if (gender === 'male') return base + 5;
+  if (gender === 'female') return base - 161;
+  return base - 78;
 }
 
 export function computeTdee(bmr: number, activityFactor: number): number {

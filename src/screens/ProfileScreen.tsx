@@ -14,36 +14,37 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import Card from '../components/Card';
 import { Button, TextField } from '../components/ui';
+import SegmentedControl from '../components/SegmentedControl';
 import { colors, spacing } from '../theme';
 import { useApp } from '../state/AppContext';
-import { computeTarget, ACTIVITY_LEVELS } from '../services/targetService';
-import type { AppConfig, Gender } from '../types';
+import {
+  computeTarget,
+  ACTIVITY_LEVELS,
+  GOAL_PRESETS,
+} from '../services/targetService';
+import { cmToFtIn, ftInToCm, kgToLb, lbToKg } from '../services/unit';
+import type { AppConfig, Gender, UnitSystem } from '../types';
 
-interface RatioPreset {
-  label: string;
-  desc: string;
-  carb: number;
-  protein: number;
-  fat: number;
-}
-
-// 四个一键预设（蛋白/脂肪/碳水百分比）
-const PRESETS: RatioPreset[] = [
-  { label: '减脂均衡', desc: '日常减脂首选', carb: 0.45, protein: 0.3, fat: 0.25 },
-  { label: '高蛋白减脂', desc: '保肌饱腹', carb: 0.4, protein: 0.4, fat: 0.2 },
-  { label: '增肌充能', desc: '高碳水供能', carb: 0.55, protein: 0.25, fat: 0.2 },
-  { label: '生酮/低碳', desc: '极低碳水', carb: 0.1, protein: 0.2, fat: 0.7 },
-];
+const GENDER_LABELS: Record<Gender, string> = {
+  male: '男',
+  female: '女',
+  unknown: '保密',
+};
 
 export default function ProfileScreen() {
   const { config, saveAndRefreshConfig } = useApp();
 
   // 基础信息（点击保存统一提交）
-  const [gender, setGender] = useState<Gender>('male');
+  const [gender, setGender] = useState<Gender>('unknown');
   const [age, setAge] = useState('');
   const [heightCm, setHeightCm] = useState('');
   const [weightKg, setWeightKg] = useState('');
   const [activityFactor, setActivityFactor] = useState(1.2);
+  // 单位偏好（美制下身高 ft+in 双字段、体重 lb）
+  const [unitSystem, setUnitSystem] = useState<UnitSystem>('metric');
+  const [heightFt, setHeightFt] = useState('');
+  const [heightIn, setHeightIn] = useState('');
+  const [weightLb, setWeightLb] = useState('');
 
   // 营养配比
   const [carbRatio, setCarbRatio] = useState('');
@@ -60,8 +61,30 @@ export default function ProfileScreen() {
       setCarbRatio(String(config.carb_ratio));
       setProteinRatio(String(config.protein_ratio));
       setFatRatio(String(config.fat_ratio));
+      setUnitSystem(config.unit_system);
+      if (config.unit_system === 'us') {
+        const { ft, in: inch } = cmToFtIn(config.height_cm);
+        setHeightFt(String(ft));
+        setHeightIn(String(inch));
+        setWeightLb(String(kgToLb(config.weight_kg)));
+      }
     }
   }, [config]);
+
+  // 切换单位：双向换算当前已填数值
+  function switchUnit(next: UnitSystem) {
+    if (next === unitSystem) return;
+    if (next === 'us') {
+      const { ft, in: inch } = cmToFtIn(Number(heightCm) || 0);
+      setHeightFt(String(ft));
+      setHeightIn(String(inch));
+      setWeightLb(String(kgToLb(Number(weightKg) || 0)));
+    } else {
+      setHeightCm(String(ftInToCm(Number(heightFt) || 0, Number(heightIn) || 0)));
+      setWeightKg(String(lbToKg(Number(weightLb) || 0)));
+    }
+    setUnitSystem(next);
+  }
 
   // 目标直接由档案计算（体重来自基础信息）
   const target = config ? computeTarget(config) : null;
@@ -81,12 +104,17 @@ export default function ProfileScreen() {
     const cfg: AppConfig = {
       gender,
       age: Number(age),
-      height_cm: Number(heightCm),
-      weight_kg: Number(weightKg),
+      height_cm:
+        unitSystem === 'us'
+          ? ftInToCm(Number(heightFt), Number(heightIn))
+          : Number(heightCm),
+      weight_kg: unitSystem === 'us' ? lbToKg(Number(weightLb)) : Number(weightKg),
       activity_factor: activityFactor,
       carb_ratio: Number(carbRatio),
       protein_ratio: Number(proteinRatio),
       fat_ratio: Number(fatRatio),
+      onboarded: config.onboarded,
+      unit_system: unitSystem,
     };
     try {
       await saveAndRefreshConfig(cfg);
@@ -102,7 +130,7 @@ export default function ProfileScreen() {
     return Math.abs(a - b) < 0.001;
   }
 
-  const activePreset = PRESETS.find(
+  const activePreset = GOAL_PRESETS.find(
     (p) =>
       ratioApproxEqual(p.carb, Number(carbRatio)) &&
       ratioApproxEqual(p.protein, Number(proteinRatio)) &&
@@ -143,7 +171,7 @@ export default function ProfileScreen() {
         <Card>
           <Text style={styles.cardTitle}>基础信息</Text>
           <View style={styles.genderRow}>
-            {(['male', 'female'] as Gender[]).map((g) => {
+            {(['male', 'female', 'unknown'] as Gender[]).map((g) => {
               const active = gender === g;
               return (
                 <Pressable
@@ -152,7 +180,7 @@ export default function ProfileScreen() {
                   onPress={() => setGender(g)}
                 >
                   <Text style={[styles.genderText, active && styles.chipTextActive]}>
-                    {g === 'male' ? '男' : '女'}
+                    {GENDER_LABELS[g]}
                   </Text>
                 </Pressable>
               );
@@ -165,20 +193,65 @@ export default function ProfileScreen() {
             placeholder="例如 30"
             keyboardType="numeric"
           />
-          <TextField
-            label="身高（cm）"
-            value={heightCm}
-            onChangeText={setHeightCm}
-            placeholder="例如 170"
-            keyboardType="numeric"
-          />
-          <TextField
-            label="体重（kg）"
-            value={weightKg}
-            onChangeText={setWeightKg}
-            placeholder="例如 70.5"
-            keyboardType="numeric"
-          />
+          <Text style={styles.fieldLabel}>单位</Text>
+          <View style={styles.unitSegWrap}>
+            <SegmentedControl<UnitSystem>
+              options={[
+                { label: '公制 cm / kg', value: 'metric' },
+                { label: '美制 ft / lb', value: 'us' },
+              ]}
+              value={unitSystem}
+              onChange={switchUnit}
+            />
+          </View>
+          {unitSystem === 'metric' ? (
+            <>
+              <TextField
+                label="身高（cm）"
+                value={heightCm}
+                onChangeText={setHeightCm}
+                placeholder="例如 170"
+                keyboardType="numeric"
+              />
+              <TextField
+                label="体重（kg）"
+                value={weightKg}
+                onChangeText={setWeightKg}
+                placeholder="例如 70.5"
+                keyboardType="numeric"
+              />
+            </>
+          ) : (
+            <>
+              <View style={styles.usHeightRow}>
+                <View style={styles.usHeightField}>
+                  <TextField
+                    label="身高（英尺 ft）"
+                    value={heightFt}
+                    onChangeText={setHeightFt}
+                    placeholder="例如 5"
+                    keyboardType="numeric"
+                  />
+                </View>
+                <View style={styles.usHeightField}>
+                  <TextField
+                    label="身高（英寸 in）"
+                    value={heightIn}
+                    onChangeText={setHeightIn}
+                    placeholder="例如 7"
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
+              <TextField
+                label="体重（磅 lb）"
+                value={weightLb}
+                onChangeText={setWeightLb}
+                placeholder="例如 154.3"
+                keyboardType="numeric"
+              />
+            </>
+          )}
           <Text style={styles.fieldLabel}>活动量</Text>
           {ACTIVITY_LEVELS.map((level) => {
             const active = Math.abs(activityFactor - level.factor) < 0.001;
@@ -201,7 +274,7 @@ export default function ProfileScreen() {
             );
           })}
           <Text style={styles.note}>
-            BMR：男 10×体重 + 6.25×身高 − 5×年龄 + 5；女同式末项 −161
+            BMR：男 10×体重 + 6.25×身高 − 5×年龄 + 5；女末项 −161；未选性别 −78
           </Text>
         </Card>
 
@@ -214,7 +287,7 @@ export default function ProfileScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.presetRow}
           >
-            {PRESETS.map((p) => {
+            {GOAL_PRESETS.map((p) => {
               const isActive = activePreset?.label === p.label;
               return (
                 <Pressable
@@ -360,6 +433,16 @@ const styles = StyleSheet.create({
     color: colors.muted,
     marginBottom: spacing.xs,
   },
+  unitSegWrap: {
+    marginBottom: spacing.md,
+  },
+  usHeightRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  usHeightField: {
+    flex: 1,
+  },
   levelRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -445,6 +528,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   ratioHintError: {
-    color: colors.sell,
+    color: colors.danger,
   },
 });
