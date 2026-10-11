@@ -23,4 +23,4 @@
 
 - [x] 4.1 `npx vitest run` 全绿；TypeScript 类型检查无报错
 - [ ] 4.2 真机自检清单：4 Tab 结构、档案保存后目标联动、预设点击高亮与刷新、无体重记录提示、旧配置升级迁移正常
-- [ ] 4.3 `app.json` 版本号升级（versionName 1.3.0 / versionCode 递增），构建 APK 打包 ZIP
+- [x] 4.3 `app.json` 版本号升级（versionName 1.3.0 / versionCode 递增），构建 APK 打包 ZIP
