@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS food_category (
 CREATE TABLE IF NOT EXISTS food_item (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
+  name_en TEXT,
   category_id INTEGER NOT NULL,
   kcal_per_100g REAL NOT NULL DEFAULT 0,
   protein_per_100g REAL NOT NULL DEFAULT 0,
@@ -17,6 +18,8 @@ CREATE TABLE IF NOT EXISTS food_item (
   fat_per_100g REAL NOT NULL DEFAULT 0,
   gi INTEGER,
   notes TEXT NOT NULL DEFAULT '',
+  notes_en TEXT,
+  portions TEXT,
   updated_at TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_food_item_category_id ON food_item (category_id);

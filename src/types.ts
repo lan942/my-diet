@@ -6,16 +6,26 @@ export interface FoodCategory {
   sort_order: number;
 }
 
+// 生活化份量预设（Household Portions）：双语标签 + 克数锚点
+export interface FoodPortion {
+  zh: string;
+  en: string;
+  grams: number;
+}
+
 export interface FoodItem {
   id: number;
-  name: string;
+  name: string; // 中文名（canonical），en 显示走 name_en
+  name_en: string | null; // 英文名；自定义食物为 null（回退 name）
   category_id: number;
   kcal_per_100g: number;
   protein_per_100g: number;
   carb_per_100g: number;
   fat_per_100g: number;
   gi: number | null;
-  notes: string;
+  notes: string; // 中文备注（canonical）
+  notes_en: string | null; // 英文备注；自定义食物为 null
+  portions: FoodPortion[] | null; // 生活化份量预设；自定义食物为 null
   updated_at: string | null;
 }
 
@@ -70,4 +80,15 @@ export interface DailyNutrition {
   total_protein: number;
   total_carb: number;
   total_fat: number;
+}
+
+// JSON 全量备份（version 当前为 1）
+export interface BackupData {
+  version: number;
+  exportedAt: string;
+  config: AppConfig;
+  intake_logs: IntakeLog[];
+  step_logs: StepLog[];
+  food_categories: FoodCategory[];
+  food_items: FoodItem[];
 }

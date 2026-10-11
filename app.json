@@ -2,7 +2,7 @@
   "expo": {
     "name": "NutriPulse: Calorie & Macros",
     "slug": "my-diet",
-    "version": "1.5.3",
+    "version": "1.8.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "light",
@@ -34,7 +34,7 @@
     },
     "android": {
       "package": "com.zhongchaojun.mydiet",
-      "versionCode": 17,
+      "versionCode": 27,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#A8E6C9"
@@ -54,7 +54,8 @@
         }
       ],
       "react-native-health-connect",
-      "expo-localization"
+      "expo-localization",
+      "expo-sharing"
     ]
   }
 }

@@ -2,7 +2,7 @@
 
 import { getDb, nowString } from '../db/database';
 import { BizError, ERR } from './errors';
-import type { DailyNutrition, IntakeLog } from '../types';
+import type { DailyNutrition, FoodItem, IntakeLog } from '../types';
 
 export class IntakeError extends BizError {}
 
@@ -31,6 +31,15 @@ export async function listIntake(date: string): Promise<IntakeLog[]> {
   const rows = await db.getAllAsync<Row>(
     'SELECT * FROM intake_log WHERE date = ? ORDER BY id',
     [date]
+  );
+  return rows.map(mapRow);
+}
+
+// 全部摄入记录（按日期正序，导出/备份用）
+export async function listAllIntake(): Promise<IntakeLog[]> {
+  const db = await getDb();
+  const rows = await db.getAllAsync<Row>(
+    'SELECT * FROM intake_log ORDER BY date, id'
   );
   return rows.map(mapRow);
 }
@@ -108,5 +117,33 @@ export async function summarizeDaily(date: string): Promise<DailyNutrition> {
     total_protein,
     total_carb,
     total_fat,
+  };
+}
+
+// ============ Quick Log 纯逻辑（vitest 可测） ============
+
+// 按当前时段推断默认餐次：<10:30 早 / <14:30 午 / <21:00 晚 / 其余加餐
+export function defaultMealFor(d: Date): 'breakfast' | 'lunch' | 'dinner' | 'snack' {
+  const minutes = d.getHours() * 60 + d.getMinutes();
+  if (minutes < 10 * 60 + 30) return 'breakfast';
+  if (minutes < 14 * 60 + 30) return 'lunch';
+  if (minutes < 21 * 60) return 'dinner';
+  return 'snack';
+}
+
+// 按份量换算营养预览：per-100g × grams/100
+export function scaleNutrition(
+  item: Pick<
+    FoodItem,
+    'kcal_per_100g' | 'protein_per_100g' | 'carb_per_100g' | 'fat_per_100g'
+  >,
+  grams: number
+): { kcal: number; protein: number; carb: number; fat: number } {
+  const factor = grams / 100;
+  return {
+    kcal: item.kcal_per_100g * factor,
+    protein: item.protein_per_100g * factor,
+    carb: item.carb_per_100g * factor,
+    fat: item.fat_per_100g * factor,
   };
 }

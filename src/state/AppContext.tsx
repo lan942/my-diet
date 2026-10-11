@@ -76,18 +76,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    await Promise.resolve();
-    setLoading(true);
-    try {
-      const [cfg, cats, items, intake, steps] = await bootstrappedLoad(currentDate);
-      setConfig(cfg);
-      setCategories(cats);
-      setFoodItems(items);
-      setIntakeLogs(intake);
-      setStepLogs(steps);
-    } finally {
-      setLoading(false);
-    }
+    // 原地刷新数据，不置 loading：置 true 会卸载 RootTabs 整棵导航树，
+    // 重挂后回到 initialRouteName，表现为「保存后跳回第一个 Tab」
+    const [cfg, cats, items, intake, steps] = await bootstrappedLoad(currentDate);
+    setConfig(cfg);
+    setCategories(cats);
+    setFoodItems(items);
+    setIntakeLogs(intake);
+    setStepLogs(steps);
   }, [currentDate]);
 
   const setCurrentDate = useCallback((date: string) => {

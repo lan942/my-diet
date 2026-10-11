@@ -62,6 +62,7 @@ function tabIcon(
 function RootTabs() {
   return (
     <Tab.Navigator
+      initialRouteName="Today"
       screenOptions={({ route }) => ({
         headerTitle: () => (
           <Text
@@ -78,10 +79,10 @@ function RootTabs() {
         tabBarInactiveTintColor: colors.muted,
       })}
     >
-      <Tab.Screen name="Profile" component={ProfileScreen} />
-      <Tab.Screen name="Food" component={FoodLibraryScreen} />
       <Tab.Screen name="Today" component={IntakeScreen} />
+      <Tab.Screen name="Food" component={FoodLibraryScreen} />
       <Tab.Screen name="Steps" component={StepScreen} />
+      <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
 }

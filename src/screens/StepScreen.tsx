@@ -6,12 +6,12 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import Card from '../components/Card';
 import { Button, TextField, Row, EmptyState } from '../components/ui';
+import Toast, { useToast } from '../components/Toast';
 import DateBar from '../components/DateBar';
 import { colors, spacing } from '../theme';
 import { useApp } from '../state/AppContext';
@@ -23,9 +23,12 @@ import { platformSteps, type PlatformStepsAvailability } from '../services/platf
 export default function StepScreen() {
   const { stepLogs, currentDate, setCurrentDate, refresh } = useApp();
   const [input, setInput] = useState('');
+  const [formError, setFormError] = useState('');
   const [todaySteps, setTodaySteps] = useState<number | null>(null);
   const [syncAvail, setSyncAvail] = useState<PlatformStepsAvailability>('unavailable');
   const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState('');
+  const { toast, toastOpacity, showToast } = useToast();
 
   useEffect(() => {
     getStepByDate(currentDate)
@@ -49,47 +52,49 @@ export default function StepScreen() {
   async function handleSync() {
     if (syncing) return;
     setSyncing(true);
+    setSyncError('');
     try {
       const avail = await platformSteps.availability();
       if (avail !== 'available') {
-        Alert.alert(t('common.error'), t('sync.unavailable'));
+        setSyncError(t('sync.unavailable'));
         return;
       }
       const granted = await platformSteps.requestPermissions();
       if (!granted) {
-        Alert.alert(t('common.error'), t('sync.denied'));
+        setSyncError(t('sync.denied'));
         return;
       }
       const read = await platformSteps.readTodaySteps();
       if (read === null) {
-        Alert.alert(t('common.error'), t('sync.unavailable'));
+        setSyncError(t('sync.unavailable'));
         return;
       }
       const result = await syncPlatformSteps(todayString(), read);
       if (result === null) {
-        Alert.alert(t('steps.today'), t('sync.protected'));
+        showToast(t('sync.protected'));
       } else {
-        Alert.alert(t('steps.today'), t('sync.success', { steps: formatNumber(result.steps) }));
+        showToast(t('sync.success', { steps: formatNumber(result.steps) }));
       }
       await refresh();
     } catch {
-      Alert.alert(t('common.error'), t('sync.unavailable'));
+      setSyncError(t('sync.unavailable'));
     } finally {
       setSyncing(false);
     }
   }
 
   async function handleSave() {
+    setFormError('');
     const n = Number(input);
     if (!isFinite(n) || n < 0) {
-      Alert.alert(t('common.error'), t('error.ERR_INVALID_STEPS'));
+      setFormError(t('error.ERR_INVALID_STEPS'));
       return;
     }
     try {
       await upsertStep(currentDate, Math.round(n));
       await refresh();
     } catch (e: unknown) {
-      Alert.alert(t('common.error'), tError(e));
+      setFormError(tError(e));
     }
   }
 
@@ -128,6 +133,11 @@ export default function StepScreen() {
                 onPress={handleSync}
                 disabled={syncing}
               />
+              {syncError ? (
+                <Text style={styles.formError} maxFontSizeMultiplier={1.4}>
+                  {syncError}
+                </Text>
+              ) : null}
             </View>
           ) : null}
         </Card>
@@ -140,10 +150,18 @@ export default function StepScreen() {
           <TextField
             label={t('steps.label')}
             value={input}
-            onChangeText={setInput}
+            onChangeText={(v) => {
+              setInput(v);
+              setFormError('');
+            }}
             placeholder={t('steps.labelPh')}
             keyboardType="numeric"
           />
+          {formError ? (
+            <Text style={styles.formError} maxFontSizeMultiplier={1.4}>
+              {formError}
+            </Text>
+          ) : null}
           <Button title={t('steps.saveOverwrite')} onPress={handleSave} />
         </Card>
 
@@ -178,6 +196,9 @@ export default function StepScreen() {
           )}
         </Card>
       </ScrollView>
+
+      {/* 轻提示（同步结果等非阻塞反馈） */}
+      <Toast message={toast} opacity={toastOpacity} />
     </SafeAreaView>
   );
 }
@@ -243,5 +264,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: colors.text,
+  },
+  formError: {
+    color: colors.danger,
+    fontSize: 13,
+    textAlign: 'center',
   },
 });

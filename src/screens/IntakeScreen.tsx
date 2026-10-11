@@ -6,7 +6,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import Card from '../components/Card';
 import { Button, TextField, Row, EmptyState } from '../components/ui';
+import Toast, { useToast } from '../components/Toast';
 import DateBar from '../components/DateBar';
 import ProgressBar from '../components/ProgressBar';
 import { colors, spacing } from '../theme';
@@ -21,7 +21,7 @@ import { useApp } from '../state/AppContext';
 import { t, tError, type TranslationKey } from '../i18n';
 import { createIntake, deleteIntake, summarizeDaily } from '../services/intakeService';
 import { computeTarget } from '../services/targetService';
-import { isLowGI } from '../services/foodService';
+import { foodDisplayName, isLowGI } from '../services/foodService';
 import type { DailyNutrition, TargetResult } from '../types';
 
 // 餐次：存储值固定为英文枚举（新数据 locale 无关）；旧数据中的中文值经映射兼容显示
@@ -68,6 +68,8 @@ export default function IntakeScreen() {
     [config]
   );
   const [showPicker, setShowPicker] = useState(false);
+  const [formError, setFormError] = useState('');
+  const { toast, toastOpacity, showToast } = useToast();
 
   useEffect(() => {
     summarizeDaily(currentDate).then(setSummary).catch(() => {});
@@ -82,9 +84,16 @@ export default function IntakeScreen() {
   }, [intakeLogs, foodItems]);
 
   async function handleAdd() {
-    if (!selectedFoodId) return Alert.alert(t('common.error'), t('intake.selectFood'));
+    setFormError('');
+    if (!selectedFoodId) {
+      setFormError(t('intake.selectFood'));
+      return;
+    }
     const g = Number(grams);
-    if (!isFinite(g) || g <= 0) return Alert.alert(t('common.error'), t('error.ERR_INVALID_GRAMS'));
+    if (!isFinite(g) || g <= 0) {
+      setFormError(t('error.ERR_INVALID_GRAMS'));
+      return;
+    }
     try {
       await createIntake({
         date: currentDate,
@@ -95,7 +104,7 @@ export default function IntakeScreen() {
       setGrams('');
       await refresh();
     } catch (e: unknown) {
-      Alert.alert(t('common.error'), tError(e));
+      setFormError(tError(e));
     }
   }
 
@@ -104,7 +113,7 @@ export default function IntakeScreen() {
       await deleteIntake(id);
       await refresh();
     } catch {
-      Alert.alert(t('common.error'), t('common.deleteFailed'));
+      showToast(t('common.deleteFailed'));
     }
   }
 
@@ -165,7 +174,7 @@ export default function IntakeScreen() {
           >
             <Text style={selectedFood ? styles.foodSelected : styles.foodPlaceholder} maxFontSizeMultiplier={1.4}>
               {selectedFood
-                ? `${selectedFood.name}${selectedFood.gi !== null && isLowGI(selectedFood.gi) ? ` · ${t('common.lowGi')}` : ''}`
+                ? `${foodDisplayName(selectedFood)}${selectedFood.gi !== null && isLowGI(selectedFood.gi) ? ` · ${t('common.lowGi')}` : ''}`
                 : t('intake.selectFood')}
             </Text>
             <Ionicons
@@ -186,6 +195,7 @@ export default function IntakeScreen() {
                   onPress={() => {
                     setSelectedFoodId(f.id);
                     setShowPicker(false);
+                    setFormError('');
                   }}
                 >
                   <Text
@@ -195,7 +205,7 @@ export default function IntakeScreen() {
                     ]}
                     maxFontSizeMultiplier={1.4}
                   >
-                    {f.name}
+                    {foodDisplayName(f)}
                   </Text>
                   {f.gi !== null && isLowGI(f.gi) && (
                     <Text style={styles.lowGiTag} maxFontSizeMultiplier={1.4}>
@@ -209,7 +219,10 @@ export default function IntakeScreen() {
           <TextField
             label={t('intake.grams')}
             value={grams}
-            onChangeText={setGrams}
+            onChangeText={(v) => {
+              setGrams(v);
+              setFormError('');
+            }}
             keyboardType="numeric"
             placeholder={t('intake.gramsPh')}
           />
@@ -226,6 +239,11 @@ export default function IntakeScreen() {
               </Pressable>
             ))}
           </View>
+          {formError ? (
+            <Text style={styles.formError} maxFontSizeMultiplier={1.4}>
+              {formError}
+            </Text>
+          ) : null}
           <Button title={t('intake.add')} onPress={handleAdd} />
         </Card>
 
@@ -246,7 +264,7 @@ export default function IntakeScreen() {
                   left={
                     <View>
                       <Text style={styles.logFood} maxFontSizeMultiplier={1.4}>
-                        {l.food?.name ?? t('intake.deletedFood')} · {l.grams.toFixed(0)}g
+                        {l.food ? foodDisplayName(l.food) : t('intake.deletedFood')} · {l.grams.toFixed(0)}g
                       </Text>
                       <Text style={styles.logMeta} maxFontSizeMultiplier={1.4}>
                         {t(mealDisplayKey(l.meal))} · {kcal.toFixed(1)} kcal
@@ -264,6 +282,9 @@ export default function IntakeScreen() {
           )}
         </Card>
       </ScrollView>
+
+      {/* 轻提示（删除失败等非阻塞反馈） */}
+      <Toast message={toast} opacity={toastOpacity} />
     </SafeAreaView>
   );
 }
@@ -378,5 +399,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.muted,
     marginTop: 2,
+  },
+  formError: {
+    color: colors.danger,
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
   },
 });

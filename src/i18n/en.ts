@@ -76,6 +76,51 @@ export const en = {
   'profile.presetApplied': '“{label}” preset applied',
   'profile.presetRatio': 'P{p}/F{f}/C{c}',
 
+  // Settings (Me page) — summary cards & preferences
+  'settings.section.profileTargets': 'Profile & Targets',
+  'settings.section.preferencesData': 'Preferences & Data',
+  'settings.card.goal': 'Goal',
+  'settings.card.bodyMetrics': 'Body Metrics',
+  'settings.card.biologicalSex': 'Biological Sex',
+  'settings.card.activityLevel': 'Activity Level',
+  'settings.edit': 'Edit',
+  'settings.sheet.goalTitle': 'Choose Goal',
+  'settings.sheet.bodyTitle': 'Body Metrics',
+  'settings.sheet.genderTitle': 'Biological Sex',
+  'settings.sheet.activityTitle': 'Activity Level',
+  'settings.unit': 'Unit System',
+  'settings.export': 'Export Data',
+  'settings.exportSub': 'JSON backup / CSV intake log',
+  'settings.exportFormatTitle': 'Choose export format',
+  'settings.exportJson': 'JSON backup (all data)',
+  'settings.exportJsonSub': 'Full backup: profile, targets and all records',
+  'settings.exportCsv': 'CSV (intake log)',
+  'settings.exportCsvSub': 'Daily intake details, spreadsheet-friendly',
+  'settings.import': 'Import / Restore',
+  'settings.importSub': 'Restore from JSON backup (overwrites data)',
+  'settings.importConfirmTitle': 'Restore backup?',
+  'settings.importConfirmMsg':
+    'Your current data will be overwritten by the backup.',
+  'settings.importAction': 'Restore',
+  'settings.imported': 'Backup restored',
+  'settings.reset': 'Clear / Reset All Data',
+  'settings.resetSub': 'Choose intake logs only or full reset',
+  'settings.resetScopeTitle': 'Choose what to clear',
+  'settings.resetIntake': 'Clear intake records only',
+  'settings.resetIntakeSub':
+    'Delete all diet logs; keep profile, targets, steps and food library',
+  'settings.resetAll': 'Clear all data & reset app',
+  'settings.resetAllSub':
+    'Erase everything and restart onboarding',
+  'settings.resetIntakeConfirmTitle': 'Clear intake records?',
+  'settings.resetIntakeConfirmMsg':
+    'All diet logs will be deleted. Profile, targets, steps and food library are kept. This cannot be undone.',
+  'settings.resetIntakeAction': 'Clear',
+  'settings.resetConfirmTitle': 'Reset all data?',
+  'settings.resetConfirmMsg':
+    'All logs and settings will be erased and the app will restart from onboarding. This cannot be undone.',
+  'settings.resetAction': 'Reset',
+
   // Activity levels
   'activity.1.label': 'Sedentary',
   'activity.1.desc': 'Little or no exercise, desk job',
@@ -131,6 +176,27 @@ export const en = {
   'food.deleteTitle': 'Delete food',
   'food.deleteMsg': 'Delete “{name}”?',
   'food.cannotDelete': 'Cannot delete',
+  'food.searchPh': 'Search foods…',
+  'food.allFoodsTitle': 'All Foods',
+  'food.per100g': 'per 100 g',
+  'food.createCustom': 'Create Custom Food',
+  'food.modePortions': 'Servings',
+  'food.modeGrams': 'Grams',
+  'food.portionUnit': 'servings',
+  'food.qtyLabel': 'Quantity',
+  'food.tag.highProtein': 'High Protein',
+  'food.tag.healthyFats': 'Healthy Fats',
+  'food.tag.complexCarb': 'Complex Carb',
+  'food.tag.highFiber': 'High Fiber',
+  'food.tag.antioxidant': 'Antioxidant',
+  'food.tag.zeroCarb': 'Zero Carb',
+  'food.quickLogTitle': 'Quick Log',
+  'food.quickLogHint': 'Choose portion & meal, add to today',
+  'food.portion': 'Portion',
+  'food.mealLabel': 'Meal',
+  'food.addToToday': 'Add to Today',
+  'food.addedToast': 'Added to today ✓',
+  'food.quickLogFailed': 'Failed to add',
 
   // Steps
   'steps.today': "Today's Steps",
@@ -182,11 +248,11 @@ export const en = {
   'onboarding.saveFailed': 'Save failed. Please try again.',
 
   // Categories (display mapping for seed data)
-  'cat.carb': 'Carbs',
-  'cat.protein': 'Protein',
-  'cat.fat': 'Fats',
-  'cat.antioxidantVeg': 'Antioxidant Veggies',
-  'cat.fiber': 'Fiber',
+  'cat.carb': 'Complex Carbs',
+  'cat.protein': 'High Protein',
+  'cat.fat': 'Healthy Fats',
+  'cat.antioxidantVeg': 'Antioxidants',
+  'cat.fiber': 'High Fiber',
 
   // Compliance
   'profile.disclaimer':
@@ -205,6 +271,9 @@ export const en = {
   'error.ERR_NUTRITION_NEGATIVE': 'Nutrition values must be non-negative',
   'error.ERR_EMPTY_FOOD_NAME': 'Food name is required',
   'error.ERR_FOOD_IN_USE': 'This food is referenced by intake logs and cannot be deleted',
+  'error.ERR_INVALID_BACKUP': 'Not a valid backup file',
+  'error.ERR_BACKUP_VERSION': 'Backup version not supported',
+  'error.ERR_BACKUP_CONFIG': 'Backup contains invalid profile data',
   'error.generic': 'Something went wrong',
 } as const;
 

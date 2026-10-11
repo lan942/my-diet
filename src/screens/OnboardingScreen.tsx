@@ -1,4 +1,5 @@
 // 首次启动 4 步引导向导：目标 → 身体参数（公/美制）→ 性别（可选）→ 活动强度 → 完成弹窗
+// 4 步 UI 由 src/components/onboarding/ 受控组件承载（与「我的」编辑抽屉共用）
 
 import React, { useMemo, useState } from 'react';
 import {
@@ -8,37 +9,26 @@ import {
   StyleSheet,
   Pressable,
   Modal,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
-import RulerPicker from '../components/RulerPicker';
-import SegmentedControl from '../components/SegmentedControl';
 import AnimatedNumber from '../components/AnimatedNumber';
+import GoalPresetCards from '../components/onboarding/GoalPresetCards';
+import BodyMetricsRulers from '../components/onboarding/BodyMetricsRulers';
+import GenderOptionCards from '../components/onboarding/GenderOptionCards';
+import ActivityLevelRows from '../components/onboarding/ActivityLevelRows';
 import { Button } from '../components/ui';
 import { colors, spacing, macroColors, cardShadow } from '../theme';
 import { useApp } from '../state/AppContext';
 import { t, tError, type TranslationKey } from '../i18n';
 import {
-  GOAL_PRESETS,
-  ACTIVITY_LEVELS,
   computeBmr,
   computeTdee,
   type GoalPreset,
 } from '../services/targetService';
-import {
-  kgToLb,
-  lbToKg,
-  ftInLabel,
-  cmToInSnap,
-  inToCm,
-} from '../services/unit';
 import type { Gender, UnitSystem } from '../types';
-
-// 活动强度 5 档的渐进色：翡翠绿（低）→ 琥珀（中）→ 珊瑚红（高）
-const LEVEL_COLORS = ['#10B981', '#10B981', '#F59E0B', '#F59E0B', '#FF6B4A'];
 
 const STEP_TITLES: TranslationKey[] = [
   'onboarding.title.1',
@@ -51,12 +41,6 @@ const STEP_HINTS: TranslationKey[] = [
   'onboarding.hint.2',
   'onboarding.hint.3',
   'onboarding.hint.4',
-];
-
-const GENDER_OPTIONS: { value: Gender; label: TranslationKey; icon: keyof typeof Ionicons.glyphMap; desc: TranslationKey; chipBg: string; iconColor: string }[] = [
-  { value: 'male', label: 'gender.male', icon: 'man-outline', desc: 'onboarding.genderMaleDesc', chipBg: '#2563eb14', iconColor: '#2563eb' },
-  { value: 'female', label: 'gender.female', icon: 'woman-outline', desc: 'onboarding.genderFemaleDesc', chipBg: '#EC489914', iconColor: '#EC4899' },
-  { value: 'unknown', label: 'gender.unknown', icon: 'help-circle-outline', desc: 'onboarding.genderUnknownDesc', chipBg: '#6b728014', iconColor: '#6b7280' },
 ];
 
 export default function OnboardingScreen() {
@@ -73,6 +57,7 @@ export default function OnboardingScreen() {
   const [activityFactor, setActivityFactor] = useState(1.2);
   const [showDone, setShowDone] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   // 完成弹窗预览目标（基于当前草稿）
   const preview = useMemo(() => {
@@ -88,14 +73,10 @@ export default function OnboardingScreen() {
 
   const canNext = step === 1 ? goal !== null : true;
 
-  function selectGoal(p: GoalPreset) {
-    Haptics.selectionAsync().catch(() => {});
-    setGoal(p);
-  }
-
   async function handleConfirm() {
     if (!goal) return;
     setSaving(true);
+    setSaveError('');
     try {
       await saveAndRefreshConfig({
         gender,
@@ -112,7 +93,8 @@ export default function OnboardingScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       setShowDone(false);
     } catch (e: unknown) {
-      Alert.alert(t('common.error'), tError(e));
+      // 完成抽屉保持打开，错误内联展示在 Start 按钮上方
+      setSaveError(tError(e));
     } finally {
       setSaving(false);
     }
@@ -147,142 +129,26 @@ export default function OnboardingScreen() {
                 {t('onboarding.offlineBadge')}
               </Text>
             </View>
-            {GOAL_PRESETS.map((p) => {
-              const active = goal?.label === p.label;
-              return (
-                <Pressable
-                  key={p.label}
-                  style={[
-                    styles.goalCard,
-                    cardShadow,
-                    active && { borderColor: p.color, backgroundColor: p.color },
-                  ]}
-                  onPress={() => selectGoal(p)}
-                >
-                  <View style={[styles.goalBar, { backgroundColor: active ? '#ffffff' : p.color }]} />
-                  <View style={styles.goalBody}>
-                    <Text style={[styles.goalLabel, active && styles.textOnColor]} maxFontSizeMultiplier={1.4}>
-                      {t(p.label)}
-                    </Text>
-                    <Text style={[styles.goalDesc, active && styles.textOnColorSoft]} maxFontSizeMultiplier={1.4}>
-                      {t(p.desc)}
-                    </Text>
-                    <View style={styles.ratioRow}>
-                      <Text
-                        style={[
-                          styles.ratioText,
-                          active ? styles.textOnColor : { color: macroColors.protein },
-                        ]}
-                        maxFontSizeMultiplier={1.4}
-                      >
-                        {t('macro.protein')} {Math.round(p.protein * 100)}%
-                      </Text>
-                      <Text
-                        style={[
-                          styles.ratioText,
-                          active ? styles.textOnColor : { color: macroColors.fat },
-                        ]}
-                        maxFontSizeMultiplier={1.4}
-                      >
-                        {t('macro.fat')} {Math.round(p.fat * 100)}%
-                      </Text>
-                      <Text
-                        style={[
-                          styles.ratioText,
-                          active ? styles.textOnColor : { color: macroColors.carb },
-                        ]}
-                        maxFontSizeMultiplier={1.4}
-                      >
-                        {t('macro.carb')} {Math.round(p.carb * 100)}%
-                      </Text>
-                    </View>
-                  </View>
-                  {active ? (
-                    <Ionicons name="checkmark-circle" size={22} color="#ffffff" />
-                  ) : null}
-                </Pressable>
-              );
-            })}
+            <GoalPresetCards value={goal} onChange={setGoal} />
           </View>
         ) : null}
 
         {step === 2 ? (
-          <View>
-            <SegmentedControl<UnitSystem>
-              options={[
-                { label: t('unit.metric'), value: 'metric' },
-                { label: t('unit.us'), value: 'us' },
-              ]}
-              value={unit}
-              onChange={setUnit}
-            />
-            <View style={styles.rulerGroup}>
-              <RulerPicker
-                min={1}
-                max={120}
-                step={1}
-                value={age}
-                unit={t('unit.age')}
-                icon="calendar-outline"
-                onChange={setAge}
-              />
-              <RulerPicker
-                min={unit === 'metric' ? 100 : 40}
-                max={unit === 'metric' ? 250 : 98}
-                step={unit === 'metric' ? 1 : 0.5}
-                value={unit === 'metric' ? heightCm : cmToInSnap(heightCm)}
-                unit={unit === 'metric' ? t('unit.cm') : t('unit.in')}
-                icon="body-outline"
-                onChange={(v) => setHeightCm(unit === 'metric' ? v : inToCm(v))}
-                formatValue={(v) =>
-                  unit === 'metric'
-                    ? `${v}`
-                    : t('unit.ftInFormat', { label: ftInLabel(v), inches: v.toFixed(1) })
-                }
-              />
-              <RulerPicker
-                min={unit === 'metric' ? 30 : 66}
-                max={unit === 'metric' ? 200 : 440}
-                step={unit === 'metric' ? 0.5 : 1}
-                value={unit === 'metric' ? weightKg : Math.round(kgToLb(weightKg))}
-                unit={unit === 'metric' ? t('unit.kg') : t('unit.lb')}
-                icon="speedometer-outline"
-                onChange={(v) => setWeightKg(unit === 'metric' ? v : lbToKg(v))}
-              />
-            </View>
-          </View>
+          <BodyMetricsRulers
+            age={age}
+            heightCm={heightCm}
+            weightKg={weightKg}
+            unit={unit}
+            onAge={setAge}
+            onHeightCm={setHeightCm}
+            onWeightKg={setWeightKg}
+            onUnit={setUnit}
+          />
         ) : null}
 
         {step === 3 ? (
           <View>
-            {GENDER_OPTIONS.map((o) => {
-              const active = gender === o.value;
-              return (
-                <Pressable
-                  key={o.value}
-                  style={[styles.genderCard, active && styles.cardActive]}
-                  onPress={() => {
-                    Haptics.selectionAsync().catch(() => {});
-                    setGender(o.value);
-                  }}
-                >
-                  <View style={[styles.genderChip, { backgroundColor: o.chipBg }]}>
-                    <Ionicons name={o.icon} size={22} color={o.iconColor} />
-                  </View>
-                  <View style={styles.genderBody}>
-                    <Text style={styles.genderLabel} maxFontSizeMultiplier={1.4}>
-                      {t(o.label)}
-                    </Text>
-                    <Text style={styles.genderDesc} maxFontSizeMultiplier={1.4}>
-                      {t(o.desc)}
-                    </Text>
-                  </View>
-                  {active ? (
-                    <Ionicons name="checkmark" size={20} color={colors.accent} />
-                  ) : null}
-                </Pressable>
-              );
-            })}
+            <GenderOptionCards value={gender} onChange={setGender} />
             <Text style={styles.note} maxFontSizeMultiplier={1.4}>
               {t('onboarding.genderNote')}
             </Text>
@@ -290,47 +156,7 @@ export default function OnboardingScreen() {
         ) : null}
 
         {step === 4 ? (
-          <View>
-            {ACTIVITY_LEVELS.map((level, idx) => {
-              const active = Math.abs(activityFactor - level.factor) < 0.001;
-              const intensityColor = LEVEL_COLORS[idx] ?? colors.muted;
-              return (
-                <Pressable
-                  key={level.factor}
-                  style={[styles.levelRow, active && styles.cardActive]}
-                  onPress={() => {
-                    Haptics.selectionAsync().catch(() => {});
-                    setActivityFactor(level.factor);
-                  }}
-                >
-                  <View style={styles.levelBody}>
-                    <View style={styles.levelTitleRow}>
-                      <Text style={styles.levelLabel} maxFontSizeMultiplier={1.4}>
-                        {t(level.label)} (×{level.factor})
-                      </Text>
-                      <View style={styles.dotsRow}>
-                        {[0, 1, 2, 3, 4].map((i) => (
-                          <View
-                            key={i}
-                            style={[
-                              styles.dot,
-                              { backgroundColor: i <= idx ? intensityColor : colors.line },
-                            ]}
-                          />
-                        ))}
-                      </View>
-                    </View>
-                    <Text style={styles.levelDesc} maxFontSizeMultiplier={1.4}>
-                      {t(level.desc)}
-                    </Text>
-                  </View>
-                  {active ? (
-                    <Ionicons name="checkmark" size={20} color={colors.accent} />
-                  ) : null}
-                </Pressable>
-              );
-            })}
-          </View>
+          <ActivityLevelRows value={activityFactor} onChange={setActivityFactor} />
         ) : null}
       </ScrollView>
 
@@ -345,7 +171,13 @@ export default function OnboardingScreen() {
           {step < 4 ? (
             <Button title={t('onboarding.next')} onPress={() => setStep(step + 1)} disabled={!canNext} />
           ) : (
-            <Button title={t('onboarding.done')} onPress={() => setShowDone(true)} />
+            <Button
+              title={t('onboarding.done')}
+              onPress={() => {
+                setSaveError('');
+                setShowDone(true);
+              }}
+            />
           )}
         </View>
       </View>
@@ -402,6 +234,11 @@ export default function OnboardingScreen() {
             <Text style={styles.sheetHint} maxFontSizeMultiplier={1.4}>
               {t('onboarding.doneHint')}
             </Text>
+            {saveError ? (
+              <Text style={styles.sheetError} maxFontSizeMultiplier={1.4}>
+                {saveError}
+              </Text>
+            ) : null}
             <Button
               title={saving ? t('onboarding.saving') : t('onboarding.start')}
               onPress={handleConfirm}
@@ -484,128 +321,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#16A34A',
-  },
-  goalCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    borderWidth: 2,
-    borderColor: colors.line,
-    borderRadius: 16,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-    overflow: 'hidden',
-  },
-  goalBar: {
-    width: 4,
-    alignSelf: 'stretch',
-    borderRadius: 2,
-    marginRight: spacing.md,
-  },
-  goalBody: {
-    flex: 1,
-  },
-  goalLabel: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  goalDesc: {
-    fontSize: 12,
-    color: colors.muted,
-    marginTop: 2,
-  },
-  ratioRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginTop: spacing.sm,
-  },
-  ratioText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  textOnColor: {
-    color: '#ffffff',
-  },
-  textOnColorSoft: {
-    color: 'rgba(255,255,255,0.85)',
-  },
-  rulerGroup: {
-    marginTop: spacing.lg,
-  },
-  genderCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    borderWidth: 2,
-    borderColor: colors.line,
-    borderRadius: 12,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-  },
-  cardActive: {
-    borderColor: colors.accent,
-    backgroundColor: '#2563eb14',
-  },
-  genderChip: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  genderBody: {
-    flex: 1,
-    marginLeft: spacing.md,
-  },
-  genderLabel: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  genderDesc: {
-    fontSize: 12,
-    color: colors.muted,
-    marginTop: 2,
-  },
-  levelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    borderWidth: 2,
-    borderColor: colors.line,
-    borderRadius: 12,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-  },
-  levelBody: {
-    flex: 1,
-  },
-  levelTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  dotsRow: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  levelLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  levelDesc: {
-    fontSize: 12,
-    color: colors.muted,
-    marginTop: 2,
   },
   note: {
     fontSize: 12,
@@ -700,5 +415,11 @@ const styles = StyleSheet.create({
   sheetBackText: {
     fontSize: 14,
     color: colors.muted,
+  },
+  sheetError: {
+    color: colors.danger,
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: spacing.md,
   },
 });
