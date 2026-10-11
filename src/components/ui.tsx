@@ -45,7 +45,9 @@ export function Button({
         },
       ]}
     >
-      <Text style={[styles.buttonText, { color: textColor }]}>{title}</Text>
+      <Text style={[styles.buttonText, { color: textColor }]} maxFontSizeMultiplier={1.4}>
+        {title}
+      </Text>
     </Pressable>
   );
 }
@@ -69,7 +71,11 @@ export function TextField({
 }: TextFieldProps) {
   return (
     <View style={styles.field}>
-      {label ? <Text style={styles.label}>{label}</Text> : null}
+      {label ? (
+        <Text style={styles.label} maxFontSizeMultiplier={1.4}>
+          {label}
+        </Text>
+      ) : null}
       <RNTextInput
         style={[styles.input, !editable && styles.inputDisabled]}
         value={value}
@@ -78,6 +84,7 @@ export function TextField({
         placeholderTextColor={colors.muted}
         keyboardType={keyboardType}
         editable={editable}
+        maxFontSizeMultiplier={1.4}
       />
     </View>
   );
@@ -101,7 +108,9 @@ export function Row({
 export function EmptyState({ text }: { text: string }) {
   return (
     <View style={styles.empty}>
-      <Text style={styles.emptyText}>{text}</Text>
+      <Text style={styles.emptyText} maxFontSizeMultiplier={1.4}>
+        {text}
+      </Text>
     </View>
   );
 }

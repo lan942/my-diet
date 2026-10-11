@@ -1,0 +1,4 @@
+<resources>
+  <!-- 中文系统下的桌面显示名（values 默认值为英文） -->
+  <string name="app_name">卡路里方舟</string>
+</resources>

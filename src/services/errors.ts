@@ -1,0 +1,25 @@
+// 业务错误码：services 只抛 code，UI 层经语言包翻译（error.<code>）
+
+export class BizError extends Error {
+  code: string;
+  constructor(code: string) {
+    super(code);
+    this.name = 'BizError';
+    this.code = code;
+  }
+}
+
+export const ERR = {
+  INVALID_STEPS: 'ERR_INVALID_STEPS',
+  INVALID_GRAMS: 'ERR_INVALID_GRAMS',
+  INVALID_GENDER: 'ERR_INVALID_GENDER',
+  INVALID_AGE: 'ERR_INVALID_AGE',
+  INVALID_HEIGHT: 'ERR_INVALID_HEIGHT',
+  INVALID_WEIGHT: 'ERR_INVALID_WEIGHT',
+  INVALID_ACTIVITY_FACTOR: 'ERR_INVALID_ACTIVITY_FACTOR',
+  RATIO_SUM: 'ERR_RATIO_SUM',
+  NUTRITION_NOT_FINITE: 'ERR_NUTRITION_NOT_FINITE',
+  NUTRITION_NEGATIVE: 'ERR_NUTRITION_NEGATIVE',
+  EMPTY_FOOD_NAME: 'ERR_EMPTY_FOOD_NAME',
+  FOOD_IN_USE: 'ERR_FOOD_IN_USE',
+} as const;

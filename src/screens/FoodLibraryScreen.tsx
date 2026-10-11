@@ -16,7 +16,9 @@ import Card from '../components/Card';
 import { Button, TextField, Row } from '../components/ui';
 import { colors, spacing } from '../theme';
 import { useApp } from '../state/AppContext';
+import { t, tError } from '../i18n';
 import {
+  categoryDisplayKey,
   createFoodItem,
   deleteFoodItem,
   isLowGI,
@@ -81,9 +83,9 @@ export default function FoodLibraryScreen() {
     const c = Number(carb);
     const f = Number(fat);
     const g = gi ? Number(gi) : null;
-    if (!name.trim()) return Alert.alert('错误', '名称不能为空');
+    if (!name.trim()) return Alert.alert(t('common.error'), t('error.ERR_EMPTY_FOOD_NAME'));
     if (!isFinite(k) || !isFinite(p) || !isFinite(c) || !isFinite(f))
-      return Alert.alert('错误', '营养值必须为数字');
+      return Alert.alert(t('common.error'), t('error.ERR_NUTRITION_NOT_FINITE'));
     try {
       if (formMode === 'edit' && editingId !== null) {
         await updateFoodItem(editingId, {
@@ -111,23 +113,23 @@ export default function FoodLibraryScreen() {
       setFormMode('hidden');
       resetForm();
       await refresh();
-    } catch (e: any) {
-      Alert.alert('错误', e?.message ?? '保存失败');
+    } catch (e: unknown) {
+      Alert.alert(t('common.error'), tError(e));
     }
   }
 
   async function handleDelete(item: FoodItem) {
-    Alert.alert('删除确认', `确定删除「${item.name}」吗？`, [
-      { text: '取消', style: 'cancel' },
+    Alert.alert(t('food.deleteTitle'), t('food.deleteMsg', { name: item.name }), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: '删除',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           try {
             await deleteFoodItem(item.id);
             await refresh();
-          } catch (e: any) {
-            Alert.alert('错误', e?.message ?? '无法删除');
+          } catch (e: unknown) {
+            Alert.alert(t('common.error'), tError(e));
           }
         },
       },
@@ -147,31 +149,40 @@ export default function FoodLibraryScreen() {
             style={[styles.catChip, selectedCat === null && styles.catChipActive]}
             onPress={() => setSelectedCat(null)}
           >
-            <Text style={[styles.catText, selectedCat === null && styles.catTextActive]}>全部</Text>
+            <Text style={[styles.catText, selectedCat === null && styles.catTextActive]} maxFontSizeMultiplier={1.4}>
+              {t('common.all')}
+            </Text>
           </Pressable>
-          {categories.map((c) => (
-            <Pressable
-              key={c.id}
-              style={[styles.catChip, selectedCat === c.id && styles.catChipActive]}
-              onPress={() => setSelectedCat(c.id)}
-            >
-              <Text style={[styles.catText, selectedCat === c.id && styles.catTextActive]}>
-                {c.name}
-              </Text>
-            </Pressable>
-          ))}
+          {categories.map((c) => {
+            const displayKey = categoryDisplayKey(c.name);
+            return (
+              <Pressable
+                key={c.id}
+                style={[styles.catChip, selectedCat === c.id && styles.catChipActive]}
+                onPress={() => setSelectedCat(c.id)}
+              >
+                <Text style={[styles.catText, selectedCat === c.id && styles.catTextActive]} maxFontSizeMultiplier={1.4}>
+                  {displayKey ? t(displayKey) : c.name}
+                </Text>
+              </Pressable>
+            );
+          })}
         </ScrollView>
 
         {/* 食物列表 */}
         <Card>
           <View style={styles.listHeader}>
-            <Text style={styles.cardTitle}>共 {filtered.length} 种食物</Text>
+            <Text style={styles.cardTitle} maxFontSizeMultiplier={1.4}>
+              {t('food.count', { n: filtered.length })}
+            </Text>
             <Pressable onPress={startAdd}>
               <Ionicons name="add-circle-outline" size={26} color={colors.accent} />
             </Pressable>
           </View>
           {filtered.length === 0 ? (
-            <Text style={styles.emptyHint}>暂无食物</Text>
+            <Text style={styles.emptyHint} maxFontSizeMultiplier={1.4}>
+              {t('food.empty')}
+            </Text>
           ) : (
             filtered.map((item) => (
               <Row
@@ -179,14 +190,18 @@ export default function FoodLibraryScreen() {
                 left={
                   <View>
                     <View style={styles.nameRow}>
-                      <Text style={styles.foodName}>{item.name}</Text>
+                      <Text style={styles.foodName} maxFontSizeMultiplier={1.4}>
+                        {item.name}
+                      </Text>
                       {item.gi !== null && isLowGI(item.gi) && (
                         <View style={styles.lowGiBadge}>
-                          <Text style={styles.lowGiText}>低 GI</Text>
+                          <Text style={styles.lowGiText} maxFontSizeMultiplier={1.4}>
+                            {t('common.lowGi')}
+                          </Text>
                         </View>
                       )}
                     </View>
-                    <Text style={styles.foodDetail}>
+                    <Text style={styles.foodDetail} maxFontSizeMultiplier={1.4}>
                       {item.kcal_per_100g} kcal · P{item.protein_per_100g} C{item.carb_per_100g} F{item.fat_per_100g}
                       {item.gi !== null ? ` · GI ${item.gi}` : ''}
                     </Text>
@@ -210,32 +225,32 @@ export default function FoodLibraryScreen() {
         {/* 表单 */}
         {formMode !== 'hidden' && (
           <Card>
-            <Text style={styles.cardTitle}>
-              {formMode === 'edit' ? '编辑食物' : '新增食物'}
+            <Text style={styles.cardTitle} maxFontSizeMultiplier={1.4}>
+              {formMode === 'edit' ? t('food.editTitle') : t('food.addTitle')}
             </Text>
-            <TextField label="名称" value={name} onChangeText={setName} />
+            <TextField label={t('food.name')} value={name} onChangeText={setName} />
             <View style={styles.numRow}>
               <View style={styles.numField}>
-                <TextField label="kcal/100g" value={kcal} onChangeText={setKcal} keyboardType="numeric" />
+                <TextField label={t('food.kcal100')} value={kcal} onChangeText={setKcal} keyboardType="numeric" />
               </View>
               <View style={styles.numField}>
-                <TextField label="蛋白/100g" value={protein} onChangeText={setProtein} keyboardType="numeric" />
+                <TextField label={t('food.protein100')} value={protein} onChangeText={setProtein} keyboardType="numeric" />
               </View>
             </View>
             <View style={styles.numRow}>
               <View style={styles.numField}>
-                <TextField label="碳水/100g" value={carb} onChangeText={setCarb} keyboardType="numeric" />
+                <TextField label={t('food.carb100')} value={carb} onChangeText={setCarb} keyboardType="numeric" />
               </View>
               <View style={styles.numField}>
-                <TextField label="脂肪/100g" value={fat} onChangeText={setFat} keyboardType="numeric" />
+                <TextField label={t('food.fat100')} value={fat} onChangeText={setFat} keyboardType="numeric" />
               </View>
             </View>
-            <TextField label="GI（可选）" value={gi} onChangeText={setGi} keyboardType="numeric" />
-            <TextField label="备注" value={notes} onChangeText={setNotes} />
+            <TextField label={t('food.giOptional')} value={gi} onChangeText={setGi} keyboardType="numeric" />
+            <TextField label={t('food.notes')} value={notes} onChangeText={setNotes} />
             <View style={styles.formActions}>
-              <Button title="取消" variant="ghost" onPress={() => setFormMode('hidden')} />
+              <Button title={t('common.cancel')} variant="ghost" onPress={() => setFormMode('hidden')} />
               <View style={{ width: spacing.sm }} />
-              <Button title="保存" onPress={handleSubmit} />
+              <Button title={t('common.save')} onPress={handleSubmit} />
             </View>
           </Card>
         )}
@@ -251,6 +266,9 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: spacing.lg,
+    maxWidth: 640,
+    width: '100%',
+    alignSelf: 'center',
   },
   catRow: {
     paddingVertical: spacing.sm,

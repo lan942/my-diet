@@ -102,9 +102,12 @@ export default function RulerPicker({
             <Ionicons name={icon} size={15} color="#2563eb" />
           </View>
         ) : null}
-        <Text style={styles.valueText}>
+        <Text style={styles.valueText} maxFontSizeMultiplier={2}>
           {display}
-          <Text style={styles.unitText}> {unit}</Text>
+          <Text style={styles.unitText} maxFontSizeMultiplier={1.4}>
+            {' '}
+            {unit}
+          </Text>
         </Text>
       </View>
       <View style={styles.rulerWrap}>

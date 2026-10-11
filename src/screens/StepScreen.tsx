@@ -15,12 +15,17 @@ import { Button, TextField, Row, EmptyState } from '../components/ui';
 import DateBar from '../components/DateBar';
 import { colors, spacing } from '../theme';
 import { useApp } from '../state/AppContext';
-import { getStepByDate, stepsToKcal, upsertStep } from '../services/stepService';
+import { formatDateShort, formatNumber, t, tError } from '../i18n';
+import { getStepByDate, stepsToKcal, syncPlatformSteps, upsertStep } from '../services/stepService';
+import { todayString } from '../db/database';
+import { platformSteps, type PlatformStepsAvailability } from '../services/platformSteps';
 
 export default function StepScreen() {
   const { stepLogs, currentDate, setCurrentDate, refresh } = useApp();
   const [input, setInput] = useState('');
   const [todaySteps, setTodaySteps] = useState<number | null>(null);
+  const [syncAvail, setSyncAvail] = useState<PlatformStepsAvailability>('unavailable');
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     getStepByDate(currentDate)
@@ -31,17 +36,60 @@ export default function StepScreen() {
       .catch(() => {});
   }, [currentDate, stepLogs]);
 
+  // 健康平台可用性探测（不触发权限弹窗）
+  useEffect(() => {
+    platformSteps
+      .availability()
+      .then(setSyncAvail)
+      .catch(() => setSyncAvail('unavailable'));
+  }, []);
+
+  // 同步入口：用户主动触发 → 运行时请求权限 → 读取当日步数写入
+  // 降级：平台不可用 / 拒绝授权 / 读取失败均给出本地反馈
+  async function handleSync() {
+    if (syncing) return;
+    setSyncing(true);
+    try {
+      const avail = await platformSteps.availability();
+      if (avail !== 'available') {
+        Alert.alert(t('common.error'), t('sync.unavailable'));
+        return;
+      }
+      const granted = await platformSteps.requestPermissions();
+      if (!granted) {
+        Alert.alert(t('common.error'), t('sync.denied'));
+        return;
+      }
+      const read = await platformSteps.readTodaySteps();
+      if (read === null) {
+        Alert.alert(t('common.error'), t('sync.unavailable'));
+        return;
+      }
+      const result = await syncPlatformSteps(todayString(), read);
+      if (result === null) {
+        Alert.alert(t('steps.today'), t('sync.protected'));
+      } else {
+        Alert.alert(t('steps.today'), t('sync.success', { steps: formatNumber(result.steps) }));
+      }
+      await refresh();
+    } catch {
+      Alert.alert(t('common.error'), t('sync.unavailable'));
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   async function handleSave() {
     const n = Number(input);
     if (!isFinite(n) || n < 0) {
-      Alert.alert('错误', '步数必须为非负数');
+      Alert.alert(t('common.error'), t('error.ERR_INVALID_STEPS'));
       return;
     }
     try {
       await upsertStep(currentDate, Math.round(n));
       await refresh();
-    } catch (e: any) {
-      Alert.alert('错误', e?.message ?? '保存失败');
+    } catch (e: unknown) {
+      Alert.alert(t('common.error'), tError(e));
     }
   }
 
@@ -55,44 +103,75 @@ export default function StepScreen() {
 
         {/* 今日步数 */}
         <Card>
-          <Text style={styles.cardTitle}>今日步数</Text>
+          <Text style={styles.cardTitle} maxFontSizeMultiplier={1.4}>
+            {t('steps.today')}
+          </Text>
           <View style={styles.stepsWrap}>
-            <Text style={styles.stepsValue}>{steps.toLocaleString()}</Text>
-            <Text style={styles.stepsUnit}>步</Text>
+            <Text style={styles.stepsValue} maxFontSizeMultiplier={2}>
+              {formatNumber(steps)}
+            </Text>
+            <Text style={styles.stepsUnit} maxFontSizeMultiplier={1.4}>
+              {t('steps.unit')}
+            </Text>
           </View>
-          <Text style={styles.kcalHint}>≈ 消耗 {kcal.toFixed(0)} kcal</Text>
+          <Text style={styles.kcalHint} maxFontSizeMultiplier={1.4}>
+            {t('steps.kcalHint', { kcal: kcal.toFixed(0) })}
+          </Text>
+          {syncAvail !== 'unavailable' ? (
+            <View style={styles.syncBox}>
+              <Text style={styles.syncRationale} maxFontSizeMultiplier={1.4}>
+                {t('sync.rationale')}
+              </Text>
+              <Button
+                title={syncing ? t('onboarding.saving') : t('sync.button')}
+                variant="ghost"
+                onPress={handleSync}
+                disabled={syncing}
+              />
+            </View>
+          ) : null}
         </Card>
 
         {/* 录入 */}
         <Card>
-          <Text style={styles.cardTitle}>录入步数</Text>
+          <Text style={styles.cardTitle} maxFontSizeMultiplier={1.4}>
+            {t('steps.inputTitle')}
+          </Text>
           <TextField
-            label="步数"
+            label={t('steps.label')}
             value={input}
             onChangeText={setInput}
-            placeholder="例如 8000"
+            placeholder={t('steps.labelPh')}
             keyboardType="numeric"
           />
-          <Button title="保存（覆盖当天）" onPress={handleSave} />
+          <Button title={t('steps.saveOverwrite')} onPress={handleSave} />
         </Card>
 
         {/* 历史 */}
         <Card>
-          <Text style={styles.cardTitle}>历史记录</Text>
+          <Text style={styles.cardTitle} maxFontSizeMultiplier={1.4}>
+            {t('steps.history')}
+          </Text>
           {stepLogs.length === 0 ? (
-            <EmptyState text="暂无步数记录" />
+            <EmptyState text={t('steps.empty')} />
           ) : (
             stepLogs.map((s) => (
               <Row
                 key={s.id}
                 left={
                   <View>
-                    <Text style={styles.dateText}>{s.date}</Text>
-                    <Text style={styles.kcalSub}>≈ {stepsToKcal(s.steps).toFixed(0)} kcal</Text>
+                    <Text style={styles.dateText} maxFontSizeMultiplier={1.4}>
+                      {formatDateShort(s.date)}
+                    </Text>
+                    <Text style={styles.kcalSub} maxFontSizeMultiplier={1.4}>
+                      ≈ {stepsToKcal(s.steps).toFixed(0)} kcal
+                    </Text>
                   </View>
                 }
                 right={
-                  <Text style={styles.stepsInline}>{s.steps.toLocaleString()}</Text>
+                  <Text style={styles.stepsInline} maxFontSizeMultiplier={1.4}>
+                    {formatNumber(s.steps)}
+                  </Text>
                 }
               />
             ))
@@ -110,6 +189,9 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: spacing.lg,
+    maxWidth: 640,
+    width: '100%',
+    alignSelf: 'center',
   },
   cardTitle: {
     fontSize: 15,
@@ -135,6 +217,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.muted,
     textAlign: 'center',
+  },
+  syncBox: {
+    marginTop: spacing.md,
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  syncRationale: {
+    fontSize: 12,
+    color: colors.muted,
+    textAlign: 'center',
+    lineHeight: 18,
   },
   dateText: {
     fontSize: 14,

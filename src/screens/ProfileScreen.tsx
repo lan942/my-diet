@@ -1,6 +1,6 @@
-// 「我的」页：每日目标（TDEE）、基础信息（含体重）、营养配比
+// 「我的」页：每日目标（TDEE）、基础信息（含体重）、营养配比、免责声明
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import { Button, TextField } from '../components/ui';
 import SegmentedControl from '../components/SegmentedControl';
 import { colors, spacing } from '../theme';
 import { useApp } from '../state/AppContext';
+import { t, tError } from '../i18n';
 import {
   computeTarget,
   ACTIVITY_LEVELS,
@@ -25,51 +26,40 @@ import {
 import { cmToFtIn, ftInToCm, kgToLb, lbToKg } from '../services/unit';
 import type { AppConfig, Gender, UnitSystem } from '../types';
 
-const GENDER_LABELS: Record<Gender, string> = {
-  male: '男',
-  female: '女',
-  unknown: '保密',
-};
+const GENDER_KEYS = {
+  male: 'gender.male',
+  female: 'gender.female',
+  unknown: 'gender.unknown',
+} as const;
 
 export default function ProfileScreen() {
   const { config, saveAndRefreshConfig } = useApp();
 
-  // 基础信息（点击保存统一提交）
-  const [gender, setGender] = useState<Gender>('unknown');
-  const [age, setAge] = useState('');
-  const [heightCm, setHeightCm] = useState('');
-  const [weightKg, setWeightKg] = useState('');
-  const [activityFactor, setActivityFactor] = useState(1.2);
+  // 基础信息（点击保存统一提交；初值由 config 派生，App 在 config 就绪后才渲染本页）
+  const [gender, setGender] = useState<Gender>(config?.gender ?? 'unknown');
+  const [age, setAge] = useState(() => String(config?.age ?? 30));
+  const [heightCm, setHeightCm] = useState(() => String(config?.height_cm ?? 170));
+  const [weightKg, setWeightKg] = useState(() => String(config?.weight_kg ?? 70));
+  const [activityFactor, setActivityFactor] = useState(config?.activity_factor ?? 1.2);
   // 单位偏好（美制下身高 ft+in 双字段、体重 lb）
-  const [unitSystem, setUnitSystem] = useState<UnitSystem>('metric');
-  const [heightFt, setHeightFt] = useState('');
-  const [heightIn, setHeightIn] = useState('');
-  const [weightLb, setWeightLb] = useState('');
+  const [unitSystem, setUnitSystem] = useState<UnitSystem>(config?.unit_system ?? 'metric');
+  const [heightFt, setHeightFt] = useState(() => {
+    if (config?.unit_system === 'us') return String(cmToFtIn(config.height_cm).ft);
+    return '';
+  });
+  const [heightIn, setHeightIn] = useState(() => {
+    if (config?.unit_system === 'us') return String(cmToFtIn(config.height_cm).in);
+    return '';
+  });
+  const [weightLb, setWeightLb] = useState(() => {
+    if (config?.unit_system === 'us') return String(Math.round(kgToLb(config.weight_kg)));
+    return '';
+  });
 
   // 营养配比
-  const [carbRatio, setCarbRatio] = useState('');
-  const [proteinRatio, setProteinRatio] = useState('');
-  const [fatRatio, setFatRatio] = useState('');
-
-  useEffect(() => {
-    if (config) {
-      setGender(config.gender);
-      setAge(String(config.age));
-      setHeightCm(String(config.height_cm));
-      setWeightKg(String(config.weight_kg));
-      setActivityFactor(config.activity_factor);
-      setCarbRatio(String(config.carb_ratio));
-      setProteinRatio(String(config.protein_ratio));
-      setFatRatio(String(config.fat_ratio));
-      setUnitSystem(config.unit_system);
-      if (config.unit_system === 'us') {
-        const { ft, in: inch } = cmToFtIn(config.height_cm);
-        setHeightFt(String(ft));
-        setHeightIn(String(inch));
-        setWeightLb(String(kgToLb(config.weight_kg)));
-      }
-    }
-  }, [config]);
+  const [carbRatio, setCarbRatio] = useState(() => String(config?.carb_ratio ?? 0.45));
+  const [proteinRatio, setProteinRatio] = useState(() => String(config?.protein_ratio ?? 0.3));
+  const [fatRatio, setFatRatio] = useState(() => String(config?.fat_ratio ?? 0.25));
 
   // 切换单位：双向换算当前已填数值
   function switchUnit(next: UnitSystem) {
@@ -93,9 +83,9 @@ export default function ProfileScreen() {
     if (!config) return;
     try {
       await saveAndRefreshConfig({ ...config, ...patch });
-      Alert.alert('保存成功', tip);
-    } catch (e: any) {
-      Alert.alert('错误', e?.message ?? '保存失败');
+      Alert.alert(t('profile.saved'), tip);
+    } catch (e: unknown) {
+      Alert.alert(t('common.error'), tError(e));
     }
   }
 
@@ -118,9 +108,9 @@ export default function ProfileScreen() {
     };
     try {
       await saveAndRefreshConfig(cfg);
-      Alert.alert('保存成功', '基础信息与营养配比已更新，其他页面数据已联动刷新');
-    } catch (e: any) {
-      Alert.alert('错误', e?.message ?? '保存失败');
+      Alert.alert(t('profile.saved'), t('profile.savedDetail'));
+    } catch (e: unknown) {
+      Alert.alert(t('common.error'), tError(e));
     }
   }
 
@@ -142,26 +132,42 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         {/* 每日目标（TDEE 估算） */}
         <Card>
-          <Text style={styles.cardTitle}>每日目标（估算）</Text>
+          <Text style={styles.cardTitle} maxFontSizeMultiplier={1.4}>
+            {t('profile.dailyTarget')}
+          </Text>
           {target ? (
             <>
               <View style={styles.targetRow}>
                 <View style={styles.targetItem}>
-                  <Text style={styles.targetValue}>{target.daily_calorie.toFixed(0)}</Text>
-                  <Text style={styles.targetUnit}>kcal (TDEE)</Text>
+                  <Text style={styles.targetValue} maxFontSizeMultiplier={2}>
+                    {target.daily_calorie.toFixed(0)}
+                  </Text>
+                  <Text style={styles.targetUnit} maxFontSizeMultiplier={1.4}>
+                    kcal (TDEE)
+                  </Text>
                 </View>
                 <View style={styles.targetItem}>
-                  <Text style={styles.targetValue}>{target.protein_g.toFixed(0)}</Text>
-                  <Text style={styles.targetUnit}>g 蛋白质</Text>
+                  <Text style={styles.targetValue} maxFontSizeMultiplier={2}>
+                    {target.protein_g.toFixed(0)}
+                  </Text>
+                  <Text style={styles.targetUnit} maxFontSizeMultiplier={1.4}>
+                    {t('macro.proteinUnit')}
+                  </Text>
                 </View>
               </View>
               <View style={styles.macroRow}>
-                <Text style={styles.macroItem}>碳水 {target.carb_g.toFixed(1)}g</Text>
-                <Text style={styles.macroItem}>蛋白 {target.protein_g.toFixed(1)}g</Text>
-                <Text style={styles.macroItem}>脂肪 {target.fat_g.toFixed(1)}g</Text>
+                <Text style={styles.macroItem} maxFontSizeMultiplier={1.4}>
+                  {t('macro.carb')} {target.carb_g.toFixed(1)}g
+                </Text>
+                <Text style={styles.macroItem} maxFontSizeMultiplier={1.4}>
+                  {t('macro.protein')} {target.protein_g.toFixed(1)}g
+                </Text>
+                <Text style={styles.macroItem} maxFontSizeMultiplier={1.4}>
+                  {t('macro.fat')} {target.fat_g.toFixed(1)}g
+                </Text>
               </View>
-              <Text style={styles.note}>
-                TDEE = BMR × 活动系数（Mifflin-St Jeor），基于档案体重与基础信息估算
+              <Text style={styles.note} maxFontSizeMultiplier={1.4}>
+                {t('profile.tdeeNote')}
               </Text>
             </>
           ) : null}
@@ -169,7 +175,9 @@ export default function ProfileScreen() {
 
         {/* 基础信息 */}
         <Card>
-          <Text style={styles.cardTitle}>基础信息</Text>
+          <Text style={styles.cardTitle} maxFontSizeMultiplier={1.4}>
+            {t('profile.basicInfo')}
+          </Text>
           <View style={styles.genderRow}>
             {(['male', 'female', 'unknown'] as Gender[]).map((g) => {
               const active = gender === g;
@@ -179,26 +187,28 @@ export default function ProfileScreen() {
                   style={[styles.genderChip, active && styles.chipActive]}
                   onPress={() => setGender(g)}
                 >
-                  <Text style={[styles.genderText, active && styles.chipTextActive]}>
-                    {GENDER_LABELS[g]}
+                  <Text style={[styles.genderText, active && styles.chipTextActive]} maxFontSizeMultiplier={1.4}>
+                    {t(GENDER_KEYS[g])}
                   </Text>
                 </Pressable>
               );
             })}
           </View>
           <TextField
-            label="年龄（岁）"
+            label={t('profile.age')}
             value={age}
             onChangeText={setAge}
-            placeholder="例如 30"
+            placeholder={t('profile.agePh')}
             keyboardType="numeric"
           />
-          <Text style={styles.fieldLabel}>单位</Text>
+          <Text style={styles.fieldLabel} maxFontSizeMultiplier={1.4}>
+            {t('profile.unitLabel')}
+          </Text>
           <View style={styles.unitSegWrap}>
             <SegmentedControl<UnitSystem>
               options={[
-                { label: '公制 cm / kg', value: 'metric' },
-                { label: '美制 ft / lb', value: 'us' },
+                { label: t('unit.metric'), value: 'metric' },
+                { label: t('unit.us'), value: 'us' },
               ]}
               value={unitSystem}
               onChange={switchUnit}
@@ -207,17 +217,17 @@ export default function ProfileScreen() {
           {unitSystem === 'metric' ? (
             <>
               <TextField
-                label="身高（cm）"
+                label={t('profile.heightCm')}
                 value={heightCm}
                 onChangeText={setHeightCm}
-                placeholder="例如 170"
+                placeholder={t('profile.heightCmPh')}
                 keyboardType="numeric"
               />
               <TextField
-                label="体重（kg）"
+                label={t('profile.weightKg')}
                 value={weightKg}
                 onChangeText={setWeightKg}
-                placeholder="例如 70.5"
+                placeholder={t('profile.weightKgPh')}
                 keyboardType="numeric"
               />
             </>
@@ -226,33 +236,35 @@ export default function ProfileScreen() {
               <View style={styles.usHeightRow}>
                 <View style={styles.usHeightField}>
                   <TextField
-                    label="身高（英尺 ft）"
+                    label={t('profile.heightFt')}
                     value={heightFt}
                     onChangeText={setHeightFt}
-                    placeholder="例如 5"
+                    placeholder={t('profile.heightFtPh')}
                     keyboardType="numeric"
                   />
                 </View>
                 <View style={styles.usHeightField}>
                   <TextField
-                    label="身高（英寸 in）"
+                    label={t('profile.heightIn')}
                     value={heightIn}
                     onChangeText={setHeightIn}
-                    placeholder="例如 7"
+                    placeholder={t('profile.heightInPh')}
                     keyboardType="numeric"
                   />
                 </View>
               </View>
               <TextField
-                label="体重（磅 lb）"
+                label={t('profile.weightLb')}
                 value={weightLb}
                 onChangeText={setWeightLb}
-                placeholder="例如 154.3"
+                placeholder={t('profile.weightLbPh')}
                 keyboardType="numeric"
               />
             </>
           )}
-          <Text style={styles.fieldLabel}>活动量</Text>
+          <Text style={styles.fieldLabel} maxFontSizeMultiplier={1.4}>
+            {t('profile.activity')}
+          </Text>
           {ACTIVITY_LEVELS.map((level) => {
             const active = Math.abs(activityFactor - level.factor) < 0.001;
             return (
@@ -262,10 +274,12 @@ export default function ProfileScreen() {
                 onPress={() => setActivityFactor(level.factor)}
               >
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.levelLabel, active && styles.levelLabelActive]}>
-                    {level.label}（×{level.factor}）
+                  <Text style={[styles.levelLabel, active && styles.levelLabelActive]} maxFontSizeMultiplier={1.4}>
+                    {t(level.label)}（×{level.factor}）
                   </Text>
-                  <Text style={styles.levelDesc}>{level.desc}</Text>
+                  <Text style={styles.levelDesc} maxFontSizeMultiplier={1.4}>
+                    {t(level.desc)}
+                  </Text>
                 </View>
                 {active ? (
                   <Ionicons name="checkmark" size={18} color={colors.accent} />
@@ -273,15 +287,19 @@ export default function ProfileScreen() {
               </Pressable>
             );
           })}
-          <Text style={styles.note}>
-            BMR：男 10×体重 + 6.25×身高 − 5×年龄 + 5；女末项 −161；未选性别 −78
+          <Text style={styles.note} maxFontSizeMultiplier={1.4}>
+            {t('profile.bmrNote')}
           </Text>
         </Card>
 
         {/* 营养配比 */}
         <Card>
-          <Text style={styles.cardTitle}>营养配比（总和必须等于 1）</Text>
-          <Text style={styles.presetLabel}>快速预设</Text>
+          <Text style={styles.cardTitle} maxFontSizeMultiplier={1.4}>
+            {t('profile.ratioTitle')}
+          </Text>
+          <Text style={styles.presetLabel} maxFontSizeMultiplier={1.4}>
+            {t('profile.quickPresets')}
+          </Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -300,39 +318,44 @@ export default function ProfileScreen() {
                     // 立即保存并刷新全局 config，让其他 Tab 联动更新
                     saveConfigPatch(
                       { carb_ratio: p.carb, protein_ratio: p.protein, fat_ratio: p.fat },
-                      `已应用「${p.label}」预设`
+                      t('profile.presetApplied', { label: t(p.label) })
                     );
                   }}
                 >
-                  <Text style={[styles.presetLabelText, isActive && styles.chipTextActive]}>
-                    {p.label}
+                  <Text style={[styles.presetLabelText, isActive && styles.chipTextActive]} maxFontSizeMultiplier={1.4}>
+                    {t(p.label)}
                   </Text>
-                  <Text style={[styles.presetDescText, isActive && styles.presetDescActive]}>
-                    {p.desc}
+                  <Text style={[styles.presetDescText, isActive && styles.presetDescActive]} maxFontSizeMultiplier={1.4}>
+                    {t(p.desc)}
                   </Text>
-                  <Text style={[styles.presetRatioText, isActive && styles.chipTextActive]}>
-                    蛋{Math.round(p.protein * 100)}/脂{Math.round(p.fat * 100)}/碳
-                    {Math.round(p.carb * 100)}
+                  <Text style={[styles.presetRatioText, isActive && styles.chipTextActive]} maxFontSizeMultiplier={1.4}>
+                    {t('profile.presetRatio', {
+                      p: Math.round(p.protein * 100),
+                      f: Math.round(p.fat * 100),
+                      c: Math.round(p.carb * 100),
+                    })}
                   </Text>
                 </Pressable>
               );
             })}
           </ScrollView>
-          <Text style={styles.divider}>— 或手动调整 —</Text>
+          <Text style={styles.divider} maxFontSizeMultiplier={1.4}>
+            {t('profile.orManually')}
+          </Text>
           <TextField
-            label="碳水比例"
+            label={t('profile.carbRatio')}
             value={carbRatio}
             onChangeText={setCarbRatio}
             keyboardType="numeric"
           />
           <TextField
-            label="蛋白质比例"
+            label={t('profile.proteinRatio')}
             value={proteinRatio}
             onChangeText={setProteinRatio}
             keyboardType="numeric"
           />
           <TextField
-            label="脂肪比例"
+            label={t('profile.fatRatio')}
             value={fatRatio}
             onChangeText={setFatRatio}
             keyboardType="numeric"
@@ -342,17 +365,21 @@ export default function ProfileScreen() {
               styles.ratioHint,
               Math.abs(ratioSum - 1) > 0.01 && styles.ratioHintError,
             ]}
+            maxFontSizeMultiplier={1.4}
           >
-            当前比例总和：{ratioSum.toFixed(3)}
+            {t('profile.ratioSum', { sum: ratioSum.toFixed(3) })}
           </Text>
-          <Text style={styles.note}>
-            碳水 g = TDEE × 碳水比例 ÷ 4{'\n'}
-            蛋白 g = TDEE × 蛋白比例 ÷ 4{'\n'}
-            脂肪 g = TDEE × 脂肪比例 ÷ 9
+          <Text style={styles.note} maxFontSizeMultiplier={1.4}>
+            {t('profile.formulaNote')}
           </Text>
         </Card>
 
-        <Button title="保存基础信息与配比" onPress={handleSave} />
+        <Button title={t('profile.saveAll')} onPress={handleSave} />
+
+        {/* 医疗免责声明（海外合规要求） */}
+        <Text style={styles.disclaimer} maxFontSizeMultiplier={1.4}>
+          {t('profile.disclaimer')}
+        </Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -365,6 +392,9 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: spacing.lg,
+    maxWidth: 640,
+    width: '100%',
+    alignSelf: 'center',
   },
   cardTitle: {
     fontSize: 15,
@@ -376,6 +406,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     marginBottom: spacing.sm,
+    flexWrap: 'wrap',
   },
   targetItem: {
     alignItems: 'center',
@@ -397,6 +428,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.line,
     marginBottom: spacing.xs,
+    flexWrap: 'wrap',
   },
   macroItem: {
     fontSize: 13,
@@ -529,5 +561,12 @@ const styles = StyleSheet.create({
   },
   ratioHintError: {
     color: colors.danger,
+  },
+  disclaimer: {
+    fontSize: 11,
+    color: colors.muted,
+    lineHeight: 16,
+    marginTop: spacing.lg,
+    textAlign: 'center',
   },
 });

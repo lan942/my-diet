@@ -28,10 +28,13 @@ export interface IntakeLog {
   created_at: string | null;
 }
 
+export type StepSource = 'manual' | 'platform';
+
 export interface StepLog {
   id: number;
   date: string; // YYYY-MM-DD
   steps: number;
+  source: StepSource; // manual=手动录入，platform=健康平台同步（Health Connect/HealthKit）
   created_at: string | null;
 }
 

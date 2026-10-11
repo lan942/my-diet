@@ -18,12 +18,31 @@ import DateBar from '../components/DateBar';
 import ProgressBar from '../components/ProgressBar';
 import { colors, spacing } from '../theme';
 import { useApp } from '../state/AppContext';
+import { t, tError, type TranslationKey } from '../i18n';
 import { createIntake, deleteIntake, summarizeDaily } from '../services/intakeService';
 import { computeTarget } from '../services/targetService';
 import { isLowGI } from '../services/foodService';
 import type { DailyNutrition, TargetResult } from '../types';
 
-const MEALS = ['早餐', '午餐', '晚餐', '加餐'];
+// 餐次：存储值固定为英文枚举（新数据 locale 无关）；旧数据中的中文值经映射兼容显示
+const MEALS: { value: string; key: TranslationKey }[] = [
+  { value: 'breakfast', key: 'meal.breakfast' },
+  { value: 'lunch', key: 'meal.lunch' },
+  { value: 'dinner', key: 'meal.dinner' },
+  { value: 'snack', key: 'meal.snack' },
+];
+
+const LEGACY_MEAL_VALUES: Record<string, string> = {
+  早餐: 'breakfast',
+  午餐: 'lunch',
+  晚餐: 'dinner',
+  加餐: 'snack',
+};
+
+function mealDisplayKey(value: string): TranslationKey {
+  const canonical = LEGACY_MEAL_VALUES[value] ?? value;
+  return (MEALS.find((m) => m.value === canonical)?.key ?? 'meal.lunch') as TranslationKey;
+}
 
 export default function IntakeScreen() {
   const {
@@ -36,22 +55,23 @@ export default function IntakeScreen() {
   } = useApp();
   const [selectedFoodId, setSelectedFoodId] = useState<number | null>(null);
   const [grams, setGrams] = useState('');
-  const [meal, setMeal] = useState('午餐');
+  const [meal, setMeal] = useState('lunch');
   const [summary, setSummary] = useState<DailyNutrition>({
     total_kcal: 0,
     total_protein: 0,
     total_carb: 0,
     total_fat: 0,
   });
-  const [target, setTarget] = useState<TargetResult | null>(null);
+  // 目标由 config 纯派生（不进 effect，避免级联渲染）
+  const target = useMemo<TargetResult | null>(
+    () => (config ? computeTarget(config) : null),
+    [config]
+  );
   const [showPicker, setShowPicker] = useState(false);
 
   useEffect(() => {
     summarizeDaily(currentDate).then(setSummary).catch(() => {});
-    if (config) {
-      setTarget(computeTarget(config));
-    }
-  }, [currentDate, intakeLogs, config]);
+  }, [currentDate, intakeLogs]);
 
   const logsWithNames = useMemo(() => {
     const map = new Map(foodItems.map((f) => [f.id, f]));
@@ -62,9 +82,9 @@ export default function IntakeScreen() {
   }, [intakeLogs, foodItems]);
 
   async function handleAdd() {
-    if (!selectedFoodId) return Alert.alert('错误', '请选择食物');
+    if (!selectedFoodId) return Alert.alert(t('common.error'), t('intake.selectFood'));
     const g = Number(grams);
-    if (!isFinite(g) || g <= 0) return Alert.alert('错误', '克数必须为正数');
+    if (!isFinite(g) || g <= 0) return Alert.alert(t('common.error'), t('error.ERR_INVALID_GRAMS'));
     try {
       await createIntake({
         date: currentDate,
@@ -74,8 +94,8 @@ export default function IntakeScreen() {
       });
       setGrams('');
       await refresh();
-    } catch (e: any) {
-      Alert.alert('错误', e?.message ?? '保存失败');
+    } catch (e: unknown) {
+      Alert.alert(t('common.error'), tError(e));
     }
   }
 
@@ -83,8 +103,8 @@ export default function IntakeScreen() {
     try {
       await deleteIntake(id);
       await refresh();
-    } catch (e: any) {
-      Alert.alert('错误', e?.message ?? '删除失败');
+    } catch {
+      Alert.alert(t('common.error'), t('common.deleteFailed'));
     }
   }
 
@@ -97,50 +117,56 @@ export default function IntakeScreen() {
 
         {/* 达成率 */}
         <Card>
-          <Text style={styles.cardTitle}>当日达成</Text>
+          <Text style={styles.cardTitle} maxFontSizeMultiplier={1.4}>
+            {t('intake.dailyProgress')}
+          </Text>
           {target ? (
             <>
               <ProgressBar
-                label="热量"
+                label={t('macro.calorie')}
                 current={summary.total_kcal}
                 target={target.daily_calorie}
                 unit="kcal"
               />
               <ProgressBar
-                label="蛋白质"
+                label={t('macro.protein')}
                 current={summary.total_protein}
                 target={target.protein_g}
                 unit="g"
               />
               <ProgressBar
-                label="碳水"
+                label={t('macro.carb')}
                 current={summary.total_carb}
                 target={target.carb_g}
                 unit="g"
               />
               <ProgressBar
-                label="脂肪"
+                label={t('macro.fat')}
                 current={summary.total_fat}
                 target={target.fat_g}
                 unit="g"
               />
             </>
           ) : (
-            <Text style={styles.emptyHint}>请先在「体重」页录入体重</Text>
+            <Text style={styles.emptyHint} maxFontSizeMultiplier={1.4}>
+              {t('intake.emptyTarget')}
+            </Text>
           )}
         </Card>
 
         {/* 新增摄入 */}
         <Card>
-          <Text style={styles.cardTitle}>记录摄入</Text>
+          <Text style={styles.cardTitle} maxFontSizeMultiplier={1.4}>
+            {t('intake.recordTitle')}
+          </Text>
           <Pressable
             onPress={() => setShowPicker((v) => !v)}
             style={styles.foodSelector}
           >
-            <Text style={selectedFood ? styles.foodSelected : styles.foodPlaceholder}>
+            <Text style={selectedFood ? styles.foodSelected : styles.foodPlaceholder} maxFontSizeMultiplier={1.4}>
               {selectedFood
-                ? `${selectedFood.name}${selectedFood.gi !== null && isLowGI(selectedFood.gi) ? ' · 低GI' : ''}`
-                : '选择食物…'}
+                ? `${selectedFood.name}${selectedFood.gi !== null && isLowGI(selectedFood.gi) ? ` · ${t('common.lowGi')}` : ''}`
+                : t('intake.selectFood')}
             </Text>
             <Ionicons
               name={showPicker ? 'chevron-up' : 'chevron-down'}
@@ -167,44 +193,49 @@ export default function IntakeScreen() {
                       styles.pickerItemText,
                       selectedFoodId === f.id && styles.pickerItemTextActive,
                     ]}
+                    maxFontSizeMultiplier={1.4}
                   >
                     {f.name}
                   </Text>
                   {f.gi !== null && isLowGI(f.gi) && (
-                    <Text style={styles.lowGiTag}>低GI</Text>
+                    <Text style={styles.lowGiTag} maxFontSizeMultiplier={1.4}>
+                      {t('common.lowGi')}
+                    </Text>
                   )}
                 </Pressable>
               ))}
             </ScrollView>
           )}
           <TextField
-            label="克数（g）"
+            label={t('intake.grams')}
             value={grams}
             onChangeText={setGrams}
             keyboardType="numeric"
-            placeholder="例如 150"
+            placeholder={t('intake.gramsPh')}
           />
           <View style={styles.mealRow}>
             {MEALS.map((m) => (
               <Pressable
-                key={m}
-                style={[styles.mealChip, meal === m && styles.mealChipActive]}
-                onPress={() => setMeal(m)}
+                key={m.value}
+                style={[styles.mealChip, meal === m.value && styles.mealChipActive]}
+                onPress={() => setMeal(m.value)}
               >
-                <Text style={[styles.mealText, meal === m && styles.mealTextActive]}>
-                  {m}
+                <Text style={[styles.mealText, meal === m.value && styles.mealTextActive]} maxFontSizeMultiplier={1.4}>
+                  {t(m.key)}
                 </Text>
               </Pressable>
             ))}
           </View>
-          <Button title="添加" onPress={handleAdd} />
+          <Button title={t('intake.add')} onPress={handleAdd} />
         </Card>
 
         {/* 当日摄入列表 */}
         <Card>
-          <Text style={styles.cardTitle}>当日记录</Text>
+          <Text style={styles.cardTitle} maxFontSizeMultiplier={1.4}>
+            {t('intake.todayLog')}
+          </Text>
           {logsWithNames.length === 0 ? (
-            <EmptyState text="今天还没有摄入记录" />
+            <EmptyState text={t('intake.emptyLog')} />
           ) : (
             logsWithNames.map((l) => {
               const factor = l.grams / 100;
@@ -214,11 +245,11 @@ export default function IntakeScreen() {
                   key={l.id}
                   left={
                     <View>
-                      <Text style={styles.logFood}>
-                        {l.food?.name ?? '(已删除食物)'} · {l.grams.toFixed(0)}g
+                      <Text style={styles.logFood} maxFontSizeMultiplier={1.4}>
+                        {l.food?.name ?? t('intake.deletedFood')} · {l.grams.toFixed(0)}g
                       </Text>
-                      <Text style={styles.logMeta}>
-                        {l.meal} · {kcal.toFixed(1)} kcal
+                      <Text style={styles.logMeta} maxFontSizeMultiplier={1.4}>
+                        {t(mealDisplayKey(l.meal))} · {kcal.toFixed(1)} kcal
                       </Text>
                     </View>
                   }
@@ -244,6 +275,9 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: spacing.lg,
+    maxWidth: 640,
+    width: '100%',
+    alignSelf: 'center',
   },
   cardTitle: {
     fontSize: 15,

@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "my-diet",
+    "name": "NutriPulse: Calorie & Macros",
     "slug": "my-diet",
-    "version": "1.4.6",
+    "version": "1.5.3",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "light",
@@ -13,12 +13,28 @@
       "backgroundColor": "#A8E6C9"
     },
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.zhongchaojun.mydiet"
+      "supportsTablet": false,
+      "bundleIdentifier": "com.zhongchaojun.mydiet",
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "NutriPulse reads today's step count from Apple Health to estimate your daily activity energy. Data is used on-device only and is never uploaded or shared."
+      },
+      "privacyManifests": {
+        "NSPrivacyTracking": false,
+        "NSPrivacyTrackingDomains": [],
+        "NSPrivacyCollectedDataTypes": [],
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "CA92.1"
+            ]
+          }
+        ]
+      }
     },
     "android": {
       "package": "com.zhongchaojun.mydiet",
-      "versionCode": 13,
+      "versionCode": 17,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#A8E6C9"
@@ -30,10 +46,15 @@
         "expo-build-properties",
         {
           "android": {
-            "buildArchs": ["arm64-v8a"]
+            "buildArchs": [
+              "arm64-v8a"
+            ],
+            "minSdkVersion": 26
           }
         }
-      ]
+      ],
+      "react-native-health-connect",
+      "expo-localization"
     ]
   }
 }

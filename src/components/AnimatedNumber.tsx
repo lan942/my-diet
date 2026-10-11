@@ -13,6 +13,7 @@ export default function AnimatedNumber({
   value,
   duration = 700,
   format,
+  maxFontSizeMultiplier = 2,
   ...textProps
 }: AnimatedNumberProps) {
   const [display, setDisplay] = useState(value);
@@ -41,6 +42,8 @@ export default function AnimatedNumber({
   }, [value, duration]);
 
   return (
-    <Text {...textProps}>{format ? format(display) : Math.round(display).toLocaleString()}</Text>
+    <Text {...textProps} maxFontSizeMultiplier={maxFontSizeMultiplier}>
+      {format ? format(display) : Math.round(display).toLocaleString()}
+    </Text>
   );
 }

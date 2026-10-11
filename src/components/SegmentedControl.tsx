@@ -29,7 +29,12 @@ export default function SegmentedControl<T extends string>({
             style={[styles.segment, active && styles.segmentActive]}
             onPress={() => onChange(o.value)}
           >
-            <Text style={[styles.text, active && styles.textActive]}>{o.label}</Text>
+            <Text
+              style={[styles.text, active && styles.textActive]}
+              maxFontSizeMultiplier={1.4}
+            >
+              {o.label}
+            </Text>
           </Pressable>
         );
       })}

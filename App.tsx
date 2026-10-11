@@ -12,6 +12,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppProvider, useApp } from './src/state/AppContext';
 import { colors } from './src/theme';
+import { t } from './src/i18n';
+import './src/i18n/detect';
 import ProfileScreen from './src/screens/ProfileScreen';
 import FoodLibraryScreen from './src/screens/FoodLibraryScreen';
 import IntakeScreen from './src/screens/IntakeScreen';
@@ -19,10 +21,10 @@ import StepScreen from './src/screens/StepScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
 
 export type RootTabParamList = {
-  我的: undefined;
-  食物库: undefined;
-  今日: undefined;
-  步数: undefined;
+  Profile: undefined;
+  Food: undefined;
+  Today: undefined;
+  Steps: undefined;
 };
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
@@ -31,10 +33,17 @@ const TAB_ICONS: Record<
   keyof RootTabParamList,
   keyof typeof Ionicons.glyphMap
 > = {
-  我的: 'person-outline',
-  食物库: 'restaurant-outline',
-  今日: 'calendar-outline',
-  步数: 'footsteps-outline',
+  Profile: 'person-outline',
+  Food: 'restaurant-outline',
+  Today: 'calendar-outline',
+  Steps: 'footsteps-outline',
+};
+
+const TAB_KEYS: Record<keyof RootTabParamList, Parameters<typeof t>[0]> = {
+  Profile: 'tab.profile',
+  Food: 'tab.food',
+  Today: 'tab.today',
+  Steps: 'tab.steps',
 };
 
 function tabIcon(
@@ -55,20 +64,24 @@ function RootTabs() {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerTitle: () => (
-          <Text style={{ fontSize: 17, fontWeight: '600', color: colors.text }}>
-            {route.name}
+          <Text
+            style={{ fontSize: 17, fontWeight: '600', color: colors.text }}
+            maxFontSizeMultiplier={1.4}
+          >
+            {t(TAB_KEYS[route.name as keyof RootTabParamList])}
           </Text>
         ),
+        tabBarLabel: t(TAB_KEYS[route.name as keyof RootTabParamList]),
         tabBarIcon: ({ focused, color, size }) =>
           tabIcon(route.name as keyof RootTabParamList, focused, color, size),
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.muted,
       })}
     >
-      <Tab.Screen name="我的" component={ProfileScreen} />
-      <Tab.Screen name="食物库" component={FoodLibraryScreen} />
-      <Tab.Screen name="今日" component={IntakeScreen} />
-      <Tab.Screen name="步数" component={StepScreen} />
+      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen name="Food" component={FoodLibraryScreen} />
+      <Tab.Screen name="Today" component={IntakeScreen} />
+      <Tab.Screen name="Steps" component={StepScreen} />
     </Tab.Navigator>
   );
 }
@@ -79,7 +92,12 @@ function Root() {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg }}>
         <ActivityIndicator size="large" color={colors.accent} />
-        <Text style={{ marginTop: 12, fontSize: 14, color: colors.muted }}>加载中…</Text>
+        <Text
+          style={{ marginTop: 12, fontSize: 14, color: colors.muted }}
+          maxFontSizeMultiplier={1.4}
+        >
+          {t('common.loading')}
+        </Text>
       </View>
     );
   }

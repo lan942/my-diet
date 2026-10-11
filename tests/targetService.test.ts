@@ -32,7 +32,11 @@ describe('computeBmr', () => {
 
 describe('GOAL_PRESETS', () => {
   it('提供 3 个核心目标模板且配比和为 1', () => {
-    expect(GOAL_PRESETS.map((p) => p.label)).toEqual(['减脂', '维持体重', '增肌']);
+    expect(GOAL_PRESETS.map((p) => p.label)).toEqual([
+      'goal.fatLoss.label',
+      'goal.maintain.label',
+      'goal.muscle.label',
+    ]);
     for (const p of GOAL_PRESETS) {
       expect(p.protein + p.fat + p.carb).toBeCloseTo(1, 6);
     }

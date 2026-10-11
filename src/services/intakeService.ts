@@ -1,9 +1,10 @@
 // 每日摄入记录 CRUD + 汇总
 
 import { getDb, nowString } from '../db/database';
-import type { DailyNutrition, FoodItem, IntakeLog } from '../types';
+import { BizError, ERR } from './errors';
+import type { DailyNutrition, IntakeLog } from '../types';
 
-export class IntakeError extends Error {}
+export class IntakeError extends BizError {}
 
 interface Row {
   id: number;
@@ -41,7 +42,7 @@ export async function createIntake(input: {
   meal: string;
 }): Promise<IntakeLog> {
   if (!isFinite(input.grams) || input.grams <= 0) {
-    throw new IntakeError('克数必须为正数');
+    throw new IntakeError(ERR.INVALID_GRAMS);
   }
   const db = await getDb();
   const time = nowString();

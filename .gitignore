@@ -27,4 +27,5 @@ ios/DerivedData
 ios/*.xcworkspace
 ios/*.xcodeproj
 *.apk
+*.aab
 *.zip

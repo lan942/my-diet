@@ -31,8 +31,10 @@ export default function ProgressBar({
   return (
     <View style={styles.wrap}>
       <View style={styles.row}>
-        <Text style={styles.label}>{label}</Text>
-        <Text style={styles.value}>
+        <Text style={styles.label} maxFontSizeMultiplier={1.4}>
+          {label}
+        </Text>
+        <Text style={styles.value} maxFontSizeMultiplier={1.4}>
           {current.toFixed(1)}/{target.toFixed(1)}
           {unit} · {percent}%
         </Text>

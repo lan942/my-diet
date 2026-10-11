@@ -4,6 +4,7 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../theme';
+import { t, formatDateShort } from '../i18n';
 
 interface DateBarProps {
   date: string; // YYYY-MM-DD
@@ -25,7 +26,7 @@ function isToday(date: string): boolean {
 }
 
 function friendly(date: string): string {
-  if (isToday(date)) return '今天';
+  if (isToday(date)) return t('common.today');
   const d = new Date(date + 'T00:00:00');
   const today = new Date();
   const diff = Math.round(
@@ -33,9 +34,9 @@ function friendly(date: string): string {
       new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()) /
       86400000
   );
-  if (diff === 1) return '昨天';
-  if (diff === 2) return '前天';
-  return `${d.getMonth() + 1}月${d.getDate()}日`;
+  if (diff === 1) return t('common.yesterday');
+  if (diff === 2) return t('common.dayBeforeYesterday');
+  return formatDateShort(date);
 }
 
 export default function DateBar({ date, onChange }: DateBarProps) {
@@ -44,7 +45,9 @@ export default function DateBar({ date, onChange }: DateBarProps) {
       <Pressable onPress={() => onChange(shift(date, -1))} hitSlop={8}>
         <Ionicons name="chevron-back" size={22} color={colors.accent} />
       </Pressable>
-      <Text style={styles.label}>{friendly(date)}</Text>
+      <Text style={styles.label} maxFontSizeMultiplier={1.4}>
+        {friendly(date)}
+      </Text>
       <Pressable onPress={() => onChange(shift(date, 1))} hitSlop={8}>
         <Ionicons name="chevron-forward" size={22} color={colors.accent} />
       </Pressable>

@@ -2,9 +2,10 @@
 
 import { getDb } from '../db/database';
 import type { AppConfig, Gender } from '../types';
+import { BizError, ERR } from './errors';
 import { ACTIVITY_LEVELS } from './targetService';
 
-export class ConfigError extends Error {}
+export class ConfigError extends BizError {}
 
 export const DEFAULT_CONFIG: AppConfig = {
   gender: 'unknown',
@@ -23,23 +24,23 @@ const ACTIVITY_FACTORS = ACTIVITY_LEVELS.map((l) => l.factor);
 
 export function validateConfig(cfg: AppConfig): void {
   if (cfg.gender !== 'male' && cfg.gender !== 'female' && cfg.gender !== 'unknown') {
-    throw new ConfigError('性别必须为男、女或不选');
+    throw new ConfigError(ERR.INVALID_GENDER);
   }
   if (!Number.isFinite(cfg.age) || cfg.age < 1 || cfg.age > 120) {
-    throw new ConfigError('年龄必须在 1~120 之间');
+    throw new ConfigError(ERR.INVALID_AGE);
   }
   if (!Number.isFinite(cfg.height_cm) || cfg.height_cm <= 0) {
-    throw new ConfigError('身高必须为正数');
+    throw new ConfigError(ERR.INVALID_HEIGHT);
   }
   if (!Number.isFinite(cfg.weight_kg) || cfg.weight_kg <= 0) {
-    throw new ConfigError('体重必须为正数');
+    throw new ConfigError(ERR.INVALID_WEIGHT);
   }
   if (!ACTIVITY_FACTORS.includes(cfg.activity_factor)) {
-    throw new ConfigError('活动量系数不合法');
+    throw new ConfigError(ERR.INVALID_ACTIVITY_FACTOR);
   }
   const sum = cfg.carb_ratio + cfg.protein_ratio + cfg.fat_ratio;
   if (Math.abs(sum - 1) > 0.001) {
-    throw new ConfigError(`宏量比例总和为 ${(sum * 100).toFixed(2)}%，必须等于 100%`);
+    throw new ConfigError(ERR.RATIO_SUM);
   }
 }
 

@@ -20,6 +20,7 @@ import AnimatedNumber from '../components/AnimatedNumber';
 import { Button } from '../components/ui';
 import { colors, spacing, macroColors, cardShadow } from '../theme';
 import { useApp } from '../state/AppContext';
+import { t, tError, type TranslationKey } from '../i18n';
 import {
   GOAL_PRESETS,
   ACTIVITY_LEVELS,
@@ -39,18 +40,23 @@ import type { Gender, UnitSystem } from '../types';
 // 活动强度 5 档的渐进色：翡翠绿（低）→ 琥珀（中）→ 珊瑚红（高）
 const LEVEL_COLORS = ['#10B981', '#10B981', '#F59E0B', '#F59E0B', '#FF6B4A'];
 
-const STEP_TITLES = ['你的目标是什么？', '基础身体参数', '性别（可选）', '日常活动强度'];
-const STEP_HINTS = [
-  '选择一个最贴近的目标，我们会据此设置营养配比',
-  '拖动刻度尺选择数值，支持公制与美国单位',
-  '欧美隐私习惯：可以不选，将按中性公式计算',
-  '如实选择日常运动频率，用于估算每日消耗',
+const STEP_TITLES: TranslationKey[] = [
+  'onboarding.title.1',
+  'onboarding.title.2',
+  'onboarding.title.3',
+  'onboarding.title.4',
+];
+const STEP_HINTS: TranslationKey[] = [
+  'onboarding.hint.1',
+  'onboarding.hint.2',
+  'onboarding.hint.3',
+  'onboarding.hint.4',
 ];
 
-const GENDER_OPTIONS: { value: Gender; label: string; icon: keyof typeof Ionicons.glyphMap; desc: string; chipBg: string; iconColor: string }[] = [
-  { value: 'male', label: '男', icon: 'man-outline', desc: 'BMR 末项 +5', chipBg: '#2563eb14', iconColor: '#2563eb' },
-  { value: 'female', label: '女', icon: 'woman-outline', desc: 'BMR 末项 −161', chipBg: '#EC489914', iconColor: '#EC4899' },
-  { value: 'unknown', label: '不选', icon: 'help-circle-outline', desc: '保密，按中性公式 −78', chipBg: '#6b728014', iconColor: '#6b7280' },
+const GENDER_OPTIONS: { value: Gender; label: TranslationKey; icon: keyof typeof Ionicons.glyphMap; desc: TranslationKey; chipBg: string; iconColor: string }[] = [
+  { value: 'male', label: 'gender.male', icon: 'man-outline', desc: 'onboarding.genderMaleDesc', chipBg: '#2563eb14', iconColor: '#2563eb' },
+  { value: 'female', label: 'gender.female', icon: 'woman-outline', desc: 'onboarding.genderFemaleDesc', chipBg: '#EC489914', iconColor: '#EC4899' },
+  { value: 'unknown', label: 'gender.unknown', icon: 'help-circle-outline', desc: 'onboarding.genderUnknownDesc', chipBg: '#6b728014', iconColor: '#6b7280' },
 ];
 
 export default function OnboardingScreen() {
@@ -105,8 +111,8 @@ export default function OnboardingScreen() {
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       setShowDone(false);
-    } catch (e: any) {
-      Alert.alert('保存失败', e?.message ?? '请重试');
+    } catch (e: unknown) {
+      Alert.alert(t('common.error'), tError(e));
     } finally {
       setSaving(false);
     }
@@ -121,9 +127,15 @@ export default function OnboardingScreen() {
             <View key={i} style={[styles.progressSeg, i <= step && styles.progressSegOn]} />
           ))}
         </View>
-        <Text style={styles.progressText}>第 {step} 步 · 共 4 步</Text>
-        <Text style={styles.title}>{STEP_TITLES[step - 1]}</Text>
-        <Text style={styles.hint}>{STEP_HINTS[step - 1]}</Text>
+        <Text style={styles.progressText} maxFontSizeMultiplier={1.4}>
+          {t('onboarding.stepOf', { step })}
+        </Text>
+        <Text style={styles.title} maxFontSizeMultiplier={1.4}>
+          {t(STEP_TITLES[step - 1])}
+        </Text>
+        <Text style={styles.hint} maxFontSizeMultiplier={1.4}>
+          {t(STEP_HINTS[step - 1])}
+        </Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -131,7 +143,9 @@ export default function OnboardingScreen() {
           <View>
             <View style={styles.offlineBadge}>
               <Ionicons name="shield-checkmark" size={15} color="#16A34A" />
-              <Text style={styles.offlineBadgeText}>纯本地离线 · 数据不出设备</Text>
+              <Text style={styles.offlineBadgeText} maxFontSizeMultiplier={1.4}>
+                {t('onboarding.offlineBadge')}
+              </Text>
             </View>
             {GOAL_PRESETS.map((p) => {
               const active = goal?.label === p.label;
@@ -147,11 +161,11 @@ export default function OnboardingScreen() {
                 >
                   <View style={[styles.goalBar, { backgroundColor: active ? '#ffffff' : p.color }]} />
                   <View style={styles.goalBody}>
-                    <Text style={[styles.goalLabel, active && styles.textOnColor]}>
-                      {p.label}
+                    <Text style={[styles.goalLabel, active && styles.textOnColor]} maxFontSizeMultiplier={1.4}>
+                      {t(p.label)}
                     </Text>
-                    <Text style={[styles.goalDesc, active && styles.textOnColorSoft]}>
-                      {p.desc}
+                    <Text style={[styles.goalDesc, active && styles.textOnColorSoft]} maxFontSizeMultiplier={1.4}>
+                      {t(p.desc)}
                     </Text>
                     <View style={styles.ratioRow}>
                       <Text
@@ -159,24 +173,27 @@ export default function OnboardingScreen() {
                           styles.ratioText,
                           active ? styles.textOnColor : { color: macroColors.protein },
                         ]}
+                        maxFontSizeMultiplier={1.4}
                       >
-                        蛋白 {Math.round(p.protein * 100)}%
+                        {t('macro.protein')} {Math.round(p.protein * 100)}%
                       </Text>
                       <Text
                         style={[
                           styles.ratioText,
                           active ? styles.textOnColor : { color: macroColors.fat },
                         ]}
+                        maxFontSizeMultiplier={1.4}
                       >
-                        脂肪 {Math.round(p.fat * 100)}%
+                        {t('macro.fat')} {Math.round(p.fat * 100)}%
                       </Text>
                       <Text
                         style={[
                           styles.ratioText,
                           active ? styles.textOnColor : { color: macroColors.carb },
                         ]}
+                        maxFontSizeMultiplier={1.4}
                       >
-                        碳水 {Math.round(p.carb * 100)}%
+                        {t('macro.carb')} {Math.round(p.carb * 100)}%
                       </Text>
                     </View>
                   </View>
@@ -193,8 +210,8 @@ export default function OnboardingScreen() {
           <View>
             <SegmentedControl<UnitSystem>
               options={[
-                { label: '公制 cm / kg', value: 'metric' },
-                { label: '美制 ft / lb', value: 'us' },
+                { label: t('unit.metric'), value: 'metric' },
+                { label: t('unit.us'), value: 'us' },
               ]}
               value={unit}
               onChange={setUnit}
@@ -205,7 +222,7 @@ export default function OnboardingScreen() {
                 max={120}
                 step={1}
                 value={age}
-                unit="岁"
+                unit={t('unit.age')}
                 icon="calendar-outline"
                 onChange={setAge}
               />
@@ -214,11 +231,13 @@ export default function OnboardingScreen() {
                 max={unit === 'metric' ? 250 : 98}
                 step={unit === 'metric' ? 1 : 0.5}
                 value={unit === 'metric' ? heightCm : cmToInSnap(heightCm)}
-                unit={unit === 'metric' ? 'cm' : 'in'}
+                unit={unit === 'metric' ? t('unit.cm') : t('unit.in')}
                 icon="body-outline"
                 onChange={(v) => setHeightCm(unit === 'metric' ? v : inToCm(v))}
                 formatValue={(v) =>
-                  unit === 'metric' ? `${v}` : `${ftInLabel(v)}（${v.toFixed(1)} in）`
+                  unit === 'metric'
+                    ? `${v}`
+                    : t('unit.ftInFormat', { label: ftInLabel(v), inches: v.toFixed(1) })
                 }
               />
               <RulerPicker
@@ -226,7 +245,7 @@ export default function OnboardingScreen() {
                 max={unit === 'metric' ? 200 : 440}
                 step={unit === 'metric' ? 0.5 : 1}
                 value={unit === 'metric' ? weightKg : Math.round(kgToLb(weightKg))}
-                unit={unit === 'metric' ? 'kg' : 'lb'}
+                unit={unit === 'metric' ? t('unit.kg') : t('unit.lb')}
                 icon="speedometer-outline"
                 onChange={(v) => setWeightKg(unit === 'metric' ? v : lbToKg(v))}
               />
@@ -251,8 +270,12 @@ export default function OnboardingScreen() {
                     <Ionicons name={o.icon} size={22} color={o.iconColor} />
                   </View>
                   <View style={styles.genderBody}>
-                    <Text style={styles.genderLabel}>{o.label}</Text>
-                    <Text style={styles.genderDesc}>{o.desc}</Text>
+                    <Text style={styles.genderLabel} maxFontSizeMultiplier={1.4}>
+                      {t(o.label)}
+                    </Text>
+                    <Text style={styles.genderDesc} maxFontSizeMultiplier={1.4}>
+                      {t(o.desc)}
+                    </Text>
                   </View>
                   {active ? (
                     <Ionicons name="checkmark" size={20} color={colors.accent} />
@@ -260,8 +283,8 @@ export default function OnboardingScreen() {
                 </Pressable>
               );
             })}
-            <Text style={styles.note}>
-              不选择时 BMR = 10×体重 + 6.25×身高 − 5×年龄 − 78（中性公式），随时可在「我的」修改
+            <Text style={styles.note} maxFontSizeMultiplier={1.4}>
+              {t('onboarding.genderNote')}
             </Text>
           </View>
         ) : null}
@@ -282,8 +305,8 @@ export default function OnboardingScreen() {
                 >
                   <View style={styles.levelBody}>
                     <View style={styles.levelTitleRow}>
-                      <Text style={styles.levelLabel}>
-                        {level.label}（×{level.factor}）
+                      <Text style={styles.levelLabel} maxFontSizeMultiplier={1.4}>
+                        {t(level.label)} (×{level.factor})
                       </Text>
                       <View style={styles.dotsRow}>
                         {[0, 1, 2, 3, 4].map((i) => (
@@ -297,7 +320,9 @@ export default function OnboardingScreen() {
                         ))}
                       </View>
                     </View>
-                    <Text style={styles.levelDesc}>{level.desc}</Text>
+                    <Text style={styles.levelDesc} maxFontSizeMultiplier={1.4}>
+                      {t(level.desc)}
+                    </Text>
                   </View>
                   {active ? (
                     <Ionicons name="checkmark" size={20} color={colors.accent} />
@@ -313,14 +338,14 @@ export default function OnboardingScreen() {
       <View style={styles.navRow}>
         <View style={styles.navSide}>
           {step > 1 ? (
-            <Button title="上一步" variant="ghost" onPress={() => setStep(step - 1)} />
+            <Button title={t('onboarding.prev')} variant="ghost" onPress={() => setStep(step - 1)} />
           ) : null}
         </View>
         <View style={styles.navMain}>
           {step < 4 ? (
-            <Button title="下一步" onPress={() => setStep(step + 1)} disabled={!canNext} />
+            <Button title={t('onboarding.next')} onPress={() => setStep(step + 1)} disabled={!canNext} />
           ) : (
-            <Button title="完成" onPress={() => setShowDone(true)} />
+            <Button title={t('onboarding.done')} onPress={() => setShowDone(true)} />
           )}
         </View>
       </View>
@@ -336,9 +361,11 @@ export default function OnboardingScreen() {
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowDone(false)} />
           <View style={[styles.sheet, { paddingBottom: spacing.xl + 16 + insets.bottom }]}>
             <View style={styles.sheetGrabber} />
-            <Text style={styles.sheetTitle}>设置完成</Text>
-            <Text style={styles.sheetSubtitle}>
-              {goal ? `已按「${goal.label}」目标生成你的每日目标` : ''}
+            <Text style={styles.sheetTitle} maxFontSizeMultiplier={1.4}>
+              {t('onboarding.doneTitle')}
+            </Text>
+            <Text style={styles.sheetSubtitle} maxFontSizeMultiplier={1.4}>
+              {goal ? t('onboarding.doneSubtitle', { goal: t(goal.label) }) : ''}
             </Text>
             {preview ? (
               <View style={styles.previewBox}>
@@ -347,28 +374,43 @@ export default function OnboardingScreen() {
                   value={preview.tdee}
                   format={(v) => `${Math.round(v)}`}
                 />
-                <Text style={styles.previewUnit}>kcal / 天 (TDEE)</Text>
+                <Text style={styles.previewUnit} maxFontSizeMultiplier={1.4}>
+                  {t('onboarding.kcalPerDay')}
+                </Text>
                 <View style={styles.previewMacros}>
-                  <Text style={[styles.previewMacro, { color: macroColors.protein }]}>
-                    蛋白 {preview.protein.toFixed(0)}g
+                  <Text
+                    style={[styles.previewMacro, { color: macroColors.protein }]}
+                    maxFontSizeMultiplier={1.4}
+                  >
+                    {t('macro.protein')} {preview.protein.toFixed(0)}g
                   </Text>
-                  <Text style={[styles.previewMacro, { color: macroColors.fat }]}>
-                    脂肪 {preview.fat.toFixed(0)}g
+                  <Text
+                    style={[styles.previewMacro, { color: macroColors.fat }]}
+                    maxFontSizeMultiplier={1.4}
+                  >
+                    {t('macro.fat')} {preview.fat.toFixed(0)}g
                   </Text>
-                  <Text style={[styles.previewMacro, { color: macroColors.carb }]}>
-                    碳水 {preview.carb.toFixed(0)}g
+                  <Text
+                    style={[styles.previewMacro, { color: macroColors.carb }]}
+                    maxFontSizeMultiplier={1.4}
+                  >
+                    {t('macro.carb')} {preview.carb.toFixed(0)}g
                   </Text>
                 </View>
               </View>
             ) : null}
-            <Text style={styles.sheetHint}>可以开始记录今天的饮食了</Text>
+            <Text style={styles.sheetHint} maxFontSizeMultiplier={1.4}>
+              {t('onboarding.doneHint')}
+            </Text>
             <Button
-              title={saving ? '保存中…' : '开始记录'}
+              title={saving ? t('onboarding.saving') : t('onboarding.start')}
               onPress={handleConfirm}
               disabled={saving}
             />
             <Pressable style={styles.sheetBack} onPress={() => setShowDone(false)}>
-              <Text style={styles.sheetBackText}>返回修改</Text>
+              <Text style={styles.sheetBackText} maxFontSizeMultiplier={1.4}>
+                {t('onboarding.backToEdit')}
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -421,6 +463,9 @@ const styles = StyleSheet.create({
   content: {
     padding: spacing.lg,
     paddingBottom: spacing.xl,
+    maxWidth: 640,
+    width: '100%',
+    alignSelf: 'center',
   },
   offlineBadge: {
     flexDirection: 'row',
