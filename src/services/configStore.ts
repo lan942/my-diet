@@ -1,29 +1,66 @@
-// 配置加载/保存/校验
+// 配置加载/保存/校验（含旧配置归一化迁移）
 
 import { getDb } from '../db/database';
-import type { AppConfig } from '../types';
+import type { AppConfig, Gender } from '../types';
+import { ACTIVITY_LEVELS } from './targetService';
 
 export class ConfigError extends Error {}
 
 export const DEFAULT_CONFIG: AppConfig = {
-  kcal_per_kg: 30,
-  protein_per_kg: 1.5,
-  carb_ratio: 0.5,
-  protein_ratio: 0.25,
+  gender: 'male',
+  age: 30,
+  height_cm: 170,
+  activity_factor: 1.2,
+  carb_ratio: 0.45,
+  protein_ratio: 0.3,
   fat_ratio: 0.25,
 };
 
+const ACTIVITY_FACTORS = ACTIVITY_LEVELS.map((l) => l.factor);
+
 export function validateConfig(cfg: AppConfig): void {
-  if (!isFinite(cfg.kcal_per_kg) || cfg.kcal_per_kg <= 0) {
-    throw new ConfigError('kcal_per_kg 必须为正数');
+  if (cfg.gender !== 'male' && cfg.gender !== 'female') {
+    throw new ConfigError('性别必须为男或女');
   }
-  if (!isFinite(cfg.protein_per_kg) || cfg.protein_per_kg <= 0) {
-    throw new ConfigError('protein_per_kg 必须为正数');
+  if (!Number.isFinite(cfg.age) || cfg.age < 1 || cfg.age > 120) {
+    throw new ConfigError('年龄必须在 1~120 之间');
+  }
+  if (!Number.isFinite(cfg.height_cm) || cfg.height_cm <= 0) {
+    throw new ConfigError('身高必须为正数');
+  }
+  if (!ACTIVITY_FACTORS.includes(cfg.activity_factor)) {
+    throw new ConfigError('活动量系数不合法');
   }
   const sum = cfg.carb_ratio + cfg.protein_ratio + cfg.fat_ratio;
   if (Math.abs(sum - 1) > 0.001) {
     throw new ConfigError(`宏量比例总和为 ${(sum * 100).toFixed(2)}%，必须等于 100%`);
   }
+}
+
+// 旧配置归一化：缺失字段补默认值，废弃字段（kcal_per_kg/protein_per_kg）丢弃，比例字段保留
+export function normalizeConfig(raw: Partial<AppConfig> | null): AppConfig {
+  const merged: AppConfig = {
+    gender: (raw?.gender === 'female' || raw?.gender === 'male'
+      ? raw.gender
+      : DEFAULT_CONFIG.gender) as Gender,
+    age: Number.isFinite(Number(raw?.age)) ? Number(raw?.age) : DEFAULT_CONFIG.age,
+    height_cm: Number.isFinite(Number(raw?.height_cm))
+      ? Number(raw?.height_cm)
+      : DEFAULT_CONFIG.height_cm,
+    activity_factor: Number.isFinite(Number(raw?.activity_factor))
+      ? Number(raw?.activity_factor)
+      : DEFAULT_CONFIG.activity_factor,
+    carb_ratio: Number.isFinite(Number(raw?.carb_ratio))
+      ? Number(raw?.carb_ratio)
+      : DEFAULT_CONFIG.carb_ratio,
+    protein_ratio: Number.isFinite(Number(raw?.protein_ratio))
+      ? Number(raw?.protein_ratio)
+      : DEFAULT_CONFIG.protein_ratio,
+    fat_ratio: Number.isFinite(Number(raw?.fat_ratio))
+      ? Number(raw?.fat_ratio)
+      : DEFAULT_CONFIG.fat_ratio,
+  };
+  return merged;
 }
 
 export async function loadConfig(): Promise<AppConfig> {
@@ -36,7 +73,14 @@ export async function loadConfig(): Promise<AppConfig> {
     await saveConfig(DEFAULT_CONFIG);
     return DEFAULT_CONFIG;
   }
-  return JSON.parse(row.value) as AppConfig;
+  // JSON 解析失败或字段缺失时回退默认配置，保证应用可启动
+  let raw: Partial<AppConfig> | null = null;
+  try {
+    raw = JSON.parse(row.value) as Partial<AppConfig>;
+  } catch {
+    raw = null;
+  }
+  return normalizeConfig(raw);
 }
 
 export async function saveConfig(cfg: AppConfig): Promise<void> {

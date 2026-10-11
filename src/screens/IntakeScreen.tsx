@@ -112,7 +112,7 @@ export default function IntakeScreen() {
               <ProgressBar
                 label="蛋白质"
                 current={summary.total_protein}
-                target={target.daily_protein}
+                target={target.protein_g}
                 unit="g"
               />
               <ProgressBar

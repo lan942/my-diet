@@ -1,4 +1,4 @@
-// 应用入口：5 底部 Tab
+// 应用入口：4 底部 Tab
 
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -11,18 +11,16 @@ import { Text } from 'react-native';
 
 import { AppProvider } from './src/state/AppContext';
 import { colors } from './src/theme';
-import WeightScreen from './src/screens/WeightScreen';
+import ProfileScreen from './src/screens/ProfileScreen';
 import FoodLibraryScreen from './src/screens/FoodLibraryScreen';
 import IntakeScreen from './src/screens/IntakeScreen';
 import StepScreen from './src/screens/StepScreen';
-import SettingsScreen from './src/screens/SettingsScreen';
 
 export type RootTabParamList = {
-  体重: undefined;
+  我的: undefined;
   食物库: undefined;
   今日: undefined;
   步数: undefined;
-  设置: undefined;
 };
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
@@ -31,11 +29,10 @@ const TAB_ICONS: Record<
   keyof RootTabParamList,
   keyof typeof Ionicons.glyphMap
 > = {
-  体重: 'body-outline',
+  我的: 'person-outline',
   食物库: 'restaurant-outline',
   今日: 'calendar-outline',
   步数: 'footsteps-outline',
-  设置: 'settings-outline',
 };
 
 function tabIcon(
@@ -66,11 +63,10 @@ function RootTabs() {
         tabBarInactiveTintColor: colors.muted,
       })}
     >
-      <Tab.Screen name="体重" component={WeightScreen} />
+      <Tab.Screen name="我的" component={ProfileScreen} />
       <Tab.Screen name="食物库" component={FoodLibraryScreen} />
       <Tab.Screen name="今日" component={IntakeScreen} />
       <Tab.Screen name="步数" component={StepScreen} />
-      <Tab.Screen name="设置" component={SettingsScreen} />
     </Tab.Navigator>
   );
 }

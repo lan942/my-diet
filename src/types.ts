@@ -41,9 +41,15 @@ export interface StepLog {
   created_at: string | null;
 }
 
+export type Gender = 'male' | 'female';
+
 export interface AppConfig {
-  kcal_per_kg: number;
-  protein_per_kg: number;
+  // 用户基础档案（用于 BMR/TDEE 计算）
+  gender: Gender;
+  age: number;
+  height_cm: number;
+  activity_factor: number;
+  // 三大宏量配比（和为 1）
   carb_ratio: number;
   protein_ratio: number;
   fat_ratio: number;
@@ -51,7 +57,6 @@ export interface AppConfig {
 
 export interface TargetResult {
   daily_calorie: number;
-  daily_protein: number;
   carb_g: number;
   protein_g: number;
   fat_g: number;
