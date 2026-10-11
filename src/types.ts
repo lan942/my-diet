@@ -1,11 +1,5 @@
 // 领域类型定义
 
-export interface WeightRecord {
-  id: number;
-  weight_kg: number;
-  recorded_at: string | null;
-}
-
 export interface FoodCategory {
   id: number;
   name: string;
@@ -48,6 +42,7 @@ export interface AppConfig {
   gender: Gender;
   age: number;
   height_cm: number;
+  weight_kg: number;
   activity_factor: number;
   // 三大宏量配比（和为 1）
   carb_ratio: number;

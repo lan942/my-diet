@@ -1,4 +1,4 @@
-// 「我的」页：每日目标（TDEE）、基础信息、体重记录、营养配比（合并原体重页与设置页）
+// 「我的」页：每日目标（TDEE）、基础信息（含体重）、营养配比
 
 import React, { useEffect, useState } from 'react';
 import {
@@ -13,12 +13,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import Card from '../components/Card';
-import { Button, TextField, Row } from '../components/ui';
+import { Button, TextField } from '../components/ui';
 import { colors, spacing } from '../theme';
 import { useApp } from '../state/AppContext';
-import { createWeight, deleteWeight, getLatestWeight } from '../services/weightService';
 import { computeTarget, ACTIVITY_LEVELS } from '../services/targetService';
-import type { AppConfig, Gender, TargetResult } from '../types';
+import type { AppConfig, Gender } from '../types';
 
 interface RatioPreset {
   label: string;
@@ -37,12 +36,13 @@ const PRESETS: RatioPreset[] = [
 ];
 
 export default function ProfileScreen() {
-  const { config, weights, refresh, saveAndRefreshConfig } = useApp();
+  const { config, saveAndRefreshConfig } = useApp();
 
   // 基础信息（点击保存统一提交）
   const [gender, setGender] = useState<Gender>('male');
   const [age, setAge] = useState('');
   const [heightCm, setHeightCm] = useState('');
+  const [weightKg, setWeightKg] = useState('');
   const [activityFactor, setActivityFactor] = useState(1.2);
 
   // 营养配比
@@ -50,15 +50,12 @@ export default function ProfileScreen() {
   const [proteinRatio, setProteinRatio] = useState('');
   const [fatRatio, setFatRatio] = useState('');
 
-  // 体重
-  const [weightInput, setWeightInput] = useState('');
-  const [target, setTarget] = useState<TargetResult | null>(null);
-
   useEffect(() => {
     if (config) {
       setGender(config.gender);
       setAge(String(config.age));
       setHeightCm(String(config.height_cm));
+      setWeightKg(String(config.weight_kg));
       setActivityFactor(config.activity_factor);
       setCarbRatio(String(config.carb_ratio));
       setProteinRatio(String(config.protein_ratio));
@@ -66,13 +63,8 @@ export default function ProfileScreen() {
     }
   }, [config]);
 
-  useEffect(() => {
-    if (config) {
-      getLatestWeight()
-        .then((w) => setTarget(computeTarget(w, config)))
-        .catch(() => {});
-    }
-  }, [config, weights]);
+  // 目标直接由档案计算（体重来自基础信息）
+  const target = config ? computeTarget(config) : null;
 
   async function saveConfigPatch(patch: Partial<AppConfig>, tip: string) {
     if (!config) return;
@@ -90,6 +82,7 @@ export default function ProfileScreen() {
       gender,
       age: Number(age),
       height_cm: Number(heightCm),
+      weight_kg: Number(weightKg),
       activity_factor: activityFactor,
       carb_ratio: Number(carbRatio),
       protein_ratio: Number(proteinRatio),
@@ -101,35 +94,6 @@ export default function ProfileScreen() {
     } catch (e: any) {
       Alert.alert('错误', e?.message ?? '保存失败');
     }
-  }
-
-  async function handleSaveWeight() {
-    const kg = Number(weightInput);
-    if (!isFinite(kg) || kg <= 0) {
-      Alert.alert('错误', '体重必须为正数');
-      return;
-    }
-    try {
-      await createWeight(kg);
-      setWeightInput('');
-      await refresh();
-    } catch (e: any) {
-      Alert.alert('错误', e?.message ?? '保存失败');
-    }
-  }
-
-  async function handleDeleteWeight(id: number) {
-    Alert.alert('删除确认', '确定删除这条体重记录吗？', [
-      { text: '取消', style: 'cancel' },
-      {
-        text: '删除',
-        style: 'destructive',
-        onPress: async () => {
-          await deleteWeight(id);
-          await refresh();
-        },
-      },
-    ]);
   }
 
   const ratioSum = Number(carbRatio) + Number(proteinRatio) + Number(fatRatio);
@@ -145,15 +109,13 @@ export default function ProfileScreen() {
       ratioApproxEqual(p.fat, Number(fatRatio))
   );
 
-  const latest = weights[0];
-
   return (
     <SafeAreaView edges={['bottom']} style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         {/* 每日目标（TDEE 估算） */}
         <Card>
           <Text style={styles.cardTitle}>每日目标（估算）</Text>
-          {latest && target ? (
+          {target ? (
             <>
               <View style={styles.targetRow}>
                 <View style={styles.targetItem}>
@@ -171,12 +133,10 @@ export default function ProfileScreen() {
                 <Text style={styles.macroItem}>脂肪 {target.fat_g.toFixed(1)}g</Text>
               </View>
               <Text style={styles.note}>
-                TDEE = BMR × 活动系数（Mifflin-St Jeor），基于最新体重与档案估算
+                TDEE = BMR × 活动系数（Mifflin-St Jeor），基于档案体重与基础信息估算
               </Text>
             </>
-          ) : (
-            <Text style={styles.emptyHint}>请先录入体重</Text>
-          )}
+          ) : null}
         </Card>
 
         {/* 基础信息 */}
@@ -212,6 +172,13 @@ export default function ProfileScreen() {
             placeholder="例如 170"
             keyboardType="numeric"
           />
+          <TextField
+            label="体重（kg）"
+            value={weightKg}
+            onChangeText={setWeightKg}
+            placeholder="例如 70.5"
+            keyboardType="numeric"
+          />
           <Text style={styles.fieldLabel}>活动量</Text>
           {ACTIVITY_LEVELS.map((level) => {
             const active = Math.abs(activityFactor - level.factor) < 0.001;
@@ -236,44 +203,6 @@ export default function ProfileScreen() {
           <Text style={styles.note}>
             BMR：男 10×体重 + 6.25×身高 − 5×年龄 + 5；女同式末项 −161
           </Text>
-        </Card>
-
-        {/* 体重录入 */}
-        <Card>
-          <Text style={styles.cardTitle}>录入体重</Text>
-          <TextField
-            label="体重（kg）"
-            value={weightInput}
-            onChangeText={setWeightInput}
-            placeholder="例如 70.5"
-            keyboardType="numeric"
-          />
-          <Button title="保存体重" onPress={handleSaveWeight} />
-        </Card>
-
-        {/* 体重历史 */}
-        <Card>
-          <Text style={styles.cardTitle}>历史记录</Text>
-          {weights.length === 0 ? (
-            <Text style={styles.emptyHint}>暂无记录</Text>
-          ) : (
-            weights.map((w) => (
-              <Row
-                key={w.id}
-                left={
-                  <View>
-                    <Text style={styles.weightValue}>{w.weight_kg.toFixed(1)} kg</Text>
-                    <Text style={styles.dateText}>{w.recorded_at}</Text>
-                  </View>
-                }
-                right={
-                  <Pressable onPress={() => handleDeleteWeight(w.id)} hitSlop={8}>
-                    <Ionicons name="trash-outline" size={18} color={colors.sell} />
-                  </Pressable>
-                }
-              />
-            ))
-          )}
         </Card>
 
         {/* 营养配比 */}
@@ -464,21 +393,6 @@ const styles = StyleSheet.create({
     color: colors.muted,
     marginTop: spacing.sm,
     lineHeight: 18,
-  },
-  emptyHint: {
-    color: colors.muted,
-    textAlign: 'center',
-    paddingVertical: spacing.md,
-  },
-  weightValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  dateText: {
-    fontSize: 12,
-    color: colors.muted,
-    marginTop: 2,
   },
   presetLabel: {
     fontSize: 13,

@@ -22,5 +22,12 @@
 ## 4. 验证与交付
 
 - [x] 4.1 `npx vitest run` 全绿；TypeScript 类型检查无报错
-- [ ] 4.2 真机自检清单：4 Tab 结构、档案保存后目标联动、预设点击高亮与刷新、无体重记录提示、旧配置升级迁移正常
+- [ ] 4.2 真机自检清单：4 Tab 结构、档案（含体重）保存后目标联动、预设点击高亮与刷新、旧配置升级迁移正常
 - [x] 4.3 `app.json` 版本号升级（versionName 1.3.0 / versionCode 递增），构建 APK 打包 ZIP
+
+## 5. 变更修订：移除体重记录（用户反馈）
+
+- [x] 5.1 `AppConfig` 新增 `weight_kg`（默认 70），校验正数，归一化迁移补默认值；`computeTarget(cfg)` 改为从档案读取体重
+- [x] 5.2 ProfileScreen 移除「录入体重」「历史记录」两卡，体重（kg）字段并入基础信息卡；删除 `weightService.ts`、`WeightRecord` 类型、AppContext `weights` 状态、schema `weight_record` 建表；IntakeScreen 改为 `computeTarget(config)`
+- [x] 5.3 同步更新 proposal/specs（录入体重记录 → REMOVED）与测试，vitest + tsc 全绿
+- [x] 5.4 版本号升 1.3.1（versionCode 6），构建 APK 打包 ZIP

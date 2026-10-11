@@ -29,6 +29,7 @@ describe('configStore.validateConfig', () => {
       gender: 'female',
       age: 28,
       height_cm: 160,
+      weight_kg: 55,
       activity_factor: 1.55,
       carb_ratio: 0.4,
       protein_ratio: 0.3,
@@ -52,6 +53,11 @@ describe('configStore.validateConfig', () => {
   it('拒绝非正数身高', () => {
     expect(() => validateConfig({ ...DEFAULT_CONFIG, height_cm: 0 })).toThrow(ConfigError);
     expect(() => validateConfig({ ...DEFAULT_CONFIG, height_cm: -170 })).toThrow(ConfigError);
+  });
+
+  it('拒绝非正数体重', () => {
+    expect(() => validateConfig({ ...DEFAULT_CONFIG, weight_kg: 0 })).toThrow(ConfigError);
+    expect(() => validateConfig({ ...DEFAULT_CONFIG, weight_kg: -70 })).toThrow(ConfigError);
   });
 
   it('拒绝五档之外的活动系数', () => {
@@ -89,6 +95,7 @@ describe('configStore.normalizeConfig', () => {
     expect(cfg.gender).toBe(DEFAULT_CONFIG.gender);
     expect(cfg.age).toBe(DEFAULT_CONFIG.age);
     expect(cfg.height_cm).toBe(DEFAULT_CONFIG.height_cm);
+    expect(cfg.weight_kg).toBe(DEFAULT_CONFIG.weight_kg);
     expect(cfg.activity_factor).toBe(DEFAULT_CONFIG.activity_factor);
   });
 

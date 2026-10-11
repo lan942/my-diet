@@ -10,6 +10,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   gender: 'male',
   age: 30,
   height_cm: 170,
+  weight_kg: 70,
   activity_factor: 1.2,
   carb_ratio: 0.45,
   protein_ratio: 0.3,
@@ -27,6 +28,9 @@ export function validateConfig(cfg: AppConfig): void {
   }
   if (!Number.isFinite(cfg.height_cm) || cfg.height_cm <= 0) {
     throw new ConfigError('身高必须为正数');
+  }
+  if (!Number.isFinite(cfg.weight_kg) || cfg.weight_kg <= 0) {
+    throw new ConfigError('体重必须为正数');
   }
   if (!ACTIVITY_FACTORS.includes(cfg.activity_factor)) {
     throw new ConfigError('活动量系数不合法');
@@ -47,6 +51,9 @@ export function normalizeConfig(raw: Partial<AppConfig> | null): AppConfig {
     height_cm: Number.isFinite(Number(raw?.height_cm))
       ? Number(raw?.height_cm)
       : DEFAULT_CONFIG.height_cm,
+    weight_kg: Number.isFinite(Number(raw?.weight_kg))
+      ? Number(raw?.weight_kg)
+      : DEFAULT_CONFIG.weight_kg,
     activity_factor: Number.isFinite(Number(raw?.activity_factor))
       ? Number(raw?.activity_factor)
       : DEFAULT_CONFIG.activity_factor,

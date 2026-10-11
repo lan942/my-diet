@@ -10,7 +10,6 @@ import { isLowGI } from '../src/services/foodService';
 import { stepsToKcal } from '../src/services/stepService';
 import { computeTarget } from '../src/services/targetService';
 import { DEFAULT_CONFIG } from '../src/services/configStore';
-import type { WeightRecord } from '../src/types';
 
 describe('isLowGI', () => {
   it('GI <= 55 视为低 GI', () => {
@@ -44,8 +43,7 @@ describe('stepsToKcal', () => {
 
 describe('targetService 宏量拆分完整性', () => {
   it('三大宏量热量之和等于 daily_calorie', () => {
-    const w: WeightRecord = { id: 1, weight_kg: 70, recorded_at: null };
-    const t = computeTarget(w, DEFAULT_CONFIG)!;
+    const t = computeTarget(DEFAULT_CONFIG);
     const sum = t.carb_g * 4 + t.protein_g * 4 + t.fat_g * 9;
     expect(sum).toBeCloseTo(t.daily_calorie, 2);
   });

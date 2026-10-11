@@ -1,13 +1,6 @@
 // SQLite 建表 DDL（幂等）
 
 export const SCHEMA_SQL = `
-CREATE TABLE IF NOT EXISTS weight_record (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  weight_kg REAL NOT NULL,
-  recorded_at TEXT
-);
-CREATE INDEX IF NOT EXISTS ix_weight_record_recorded_at ON weight_record (recorded_at);
-
 CREATE TABLE IF NOT EXISTS food_category (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL UNIQUE,

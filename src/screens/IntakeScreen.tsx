@@ -20,7 +20,6 @@ import { colors, spacing } from '../theme';
 import { useApp } from '../state/AppContext';
 import { createIntake, deleteIntake, summarizeDaily } from '../services/intakeService';
 import { computeTarget } from '../services/targetService';
-import { getLatestWeight } from '../services/weightService';
 import { isLowGI } from '../services/foodService';
 import type { DailyNutrition, TargetResult } from '../types';
 
@@ -50,9 +49,7 @@ export default function IntakeScreen() {
   useEffect(() => {
     summarizeDaily(currentDate).then(setSummary).catch(() => {});
     if (config) {
-      getLatestWeight()
-        .then((w) => setTarget(computeTarget(w, config)))
-        .catch(() => {});
+      setTarget(computeTarget(config));
     }
   }, [currentDate, intakeLogs, config]);
 

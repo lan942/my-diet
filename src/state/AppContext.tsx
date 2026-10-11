@@ -1,4 +1,4 @@
-// 全局状态：config + weights + foodCategories + foodItems + intakeLogs + stepLogs + refresh
+// 全局状态：config + foodCategories + foodItems + intakeLogs + stepLogs + refresh
 
 import {
   createContext,
@@ -11,7 +11,6 @@ import {
 import type { ReactNode } from 'react';
 
 import { loadConfig, saveConfig } from '../services/configStore';
-import { listWeights } from '../services/weightService';
 import { listCategories, listFoodItems, ensureSeedCategories, ensureSeedFoods } from '../services/foodService';
 import { listIntake } from '../services/intakeService';
 import { listSteps } from '../services/stepService';
@@ -22,12 +21,10 @@ import type {
   FoodItem,
   IntakeLog,
   StepLog,
-  WeightRecord,
 } from '../types';
 
 interface AppContextValue {
   config: AppConfig | null;
-  weights: WeightRecord[];
   categories: FoodCategory[];
   foodItems: FoodItem[];
   intakeLogs: IntakeLog[];
@@ -56,23 +53,21 @@ function ensureSeedsOnce(): Promise<void> {
 
 async function bootstrappedLoad(
   date: string
-): Promise<[AppConfig, WeightRecord[], FoodCategory[], FoodItem[], IntakeLog[], StepLog[]]> {
+): Promise<[AppConfig, FoodCategory[], FoodItem[], IntakeLog[], StepLog[]]> {
   await ensureSeedsOnce();
 
-  const [cfg, w, cats, items, intake, steps] = await Promise.all([
+  const [cfg, cats, items, intake, steps] = await Promise.all([
     loadConfig(),
-    listWeights(),
     listCategories(),
     listFoodItems(),
     listIntake(date),
     listSteps(),
   ]);
-  return [cfg, w, cats, items, intake, steps];
+  return [cfg, cats, items, intake, steps];
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [config, setConfig] = useState<AppConfig | null>(null);
-  const [weights, setWeights] = useState<WeightRecord[]>([]);
   const [categories, setCategories] = useState<FoodCategory[]>([]);
   const [foodItems, setFoodItems] = useState<FoodItem[]>([]);
   const [intakeLogs, setIntakeLogs] = useState<IntakeLog[]>([]);
@@ -84,9 +79,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await Promise.resolve();
     setLoading(true);
     try {
-      const [cfg, w, cats, items, intake, steps] = await bootstrappedLoad(currentDate);
+      const [cfg, cats, items, intake, steps] = await bootstrappedLoad(currentDate);
       setConfig(cfg);
-      setWeights(w);
       setCategories(cats);
       setFoodItems(items);
       setIntakeLogs(intake);
@@ -108,10 +102,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     bootstrappedLoad(currentDate)
-      .then(([cfg, w, cats, items, intake, steps]) => {
+      .then(([cfg, cats, items, intake, steps]) => {
         if (cancelled) return;
         setConfig(cfg);
-        setWeights(w);
         setCategories(cats);
         setFoodItems(items);
         setIntakeLogs(intake);
@@ -129,7 +122,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AppContextValue>(
     () => ({
       config,
-      weights,
       categories,
       foodItems,
       intakeLogs,
@@ -142,7 +134,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }),
     [
       config,
-      weights,
       categories,
       foodItems,
       intakeLogs,

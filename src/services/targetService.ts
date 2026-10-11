@@ -1,6 +1,6 @@
 // 每日目标计算：BMR (Mifflin-St Jeor) → TDEE (BMR × 活动系数) → 宏量拆分
 
-import type { AppConfig, Gender, TargetResult, WeightRecord } from '../types';
+import type { AppConfig, Gender, TargetResult } from '../types';
 
 // 每克宏量的热量（kcal/g）
 const KCAL_PER_G_CARB = 4;
@@ -37,14 +37,8 @@ export function computeTdee(bmr: number, activityFactor: number): number {
   return bmr * activityFactor;
 }
 
-export function computeTarget(
-  latestWeight: WeightRecord | null,
-  cfg: AppConfig
-): TargetResult | null {
-  if (!latestWeight) {
-    return null;
-  }
-  const bmr = computeBmr(cfg.gender, latestWeight.weight_kg, cfg.height_cm, cfg.age);
+export function computeTarget(cfg: AppConfig): TargetResult {
+  const bmr = computeBmr(cfg.gender, cfg.weight_kg, cfg.height_cm, cfg.age);
   const daily_calorie = computeTdee(bmr, cfg.activity_factor);
 
   const carb_g = (daily_calorie * cfg.carb_ratio) / KCAL_PER_G_CARB;
