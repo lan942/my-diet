@@ -1,6 +1,7 @@
 node_modules/
 .expo/
 .expo-shared/
+.trae/
 dist/
 build/
 *.log
