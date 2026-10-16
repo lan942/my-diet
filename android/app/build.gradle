@@ -92,8 +92,8 @@ android {
         applicationId 'com.zhongchaojun.mydiet'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 27
-        versionName "1.8.2"
+        versionCode 30
+        versionName "1.9.1"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }

@@ -5,11 +5,12 @@ export const en = {
   'tab.profile': 'Me',
   'tab.food': 'Food',
   'tab.today': 'Today',
-  'tab.steps': 'Steps',
 
   // Common
   'common.loading': 'Loading…',
   'common.error': 'Error',
+  'common.retry': 'Try Again',
+  'common.bootError': 'Something went wrong while starting the app. Please try again.',
   'common.save': 'Save',
   'common.cancel': 'Cancel',
   'common.delete': 'Delete',
@@ -20,6 +21,8 @@ export const en = {
   'common.today': 'Today',
   'common.yesterday': 'Yesterday',
   'common.dayBeforeYesterday': '2 days ago',
+  'date.previous': 'Previous day',
+  'date.next': 'Next day',
 
   // Macros & gender & units
   'macro.calorie': 'Calories',
@@ -175,8 +178,11 @@ export const en = {
   'food.errNutrition': 'Nutrition values must be numbers',
   'food.deleteTitle': 'Delete food',
   'food.deleteMsg': 'Delete “{name}”?',
+  'intake.deleteTitle': 'Delete entry',
+  'intake.deleteMsg': 'Delete this intake entry? This cannot be undone.',
   'food.cannotDelete': 'Cannot delete',
   'food.searchPh': 'Search foods…',
+  'food.clearSearch': 'Clear search',
   'food.allFoodsTitle': 'All Foods',
   'food.per100g': 'per 100 g',
   'food.createCustom': 'Create Custom Food',
@@ -198,26 +204,26 @@ export const en = {
   'food.addedToast': 'Added to today ✓',
   'food.quickLogFailed': 'Failed to add',
 
-  // Steps
-  'steps.today': "Today's Steps",
+  // Steps (device-synced on Today)
+  'steps.cardTitle': 'Steps',
   'steps.unit': 'steps',
   'steps.kcalHint': '≈ {kcal} kcal burned',
-  'steps.inputTitle': 'Enter Steps',
-  'steps.label': 'Steps',
-  'steps.labelPh': 'e.g. 8000',
-  'steps.saveOverwrite': 'Save (overwrites the day)',
-  'steps.history': 'History',
-  'steps.empty': 'No step records yet',
+  'steps.connect': 'Connect Health App',
+  'steps.syncing': 'Syncing…',
+  'steps.notConnected': 'Not connected yet',
+
+  // Energy balance
+  'energy.net': 'Net kcal',
+  'energy.remaining': 'Left',
+  'energy.adjustedHint': 'Target includes step burn',
 
   // Step sync (Health Connect / HealthKit)
   'sync.button': 'Sync from Health',
   'sync.rationale':
-    'We read today’s step count from your device health service to estimate active energy. Data stays on this device.',
+    'We read this day’s step count from your device health service to estimate active energy. Data stays on this device.',
   'sync.success': 'Synced {steps} steps',
-  'sync.denied': 'Permission denied. You can still enter steps manually.',
+  'sync.denied': 'Permission denied. Tap to reconnect and allow step read access.',
   'sync.unavailable': 'Health service not available on this device',
-  'sync.done': 'Already synced via health service',
-  'sync.protected': 'Manual entry for this day kept — sync skipped.',
 
   // Onboarding
   'onboarding.stepOf': 'Step {step} of 4',
@@ -270,6 +276,7 @@ export const en = {
   'error.ERR_NUTRITION_NOT_FINITE': 'Nutrition values must be finite numbers',
   'error.ERR_NUTRITION_NEGATIVE': 'Nutrition values must be non-negative',
   'error.ERR_EMPTY_FOOD_NAME': 'Food name is required',
+  'error.ERR_INVALID_GI': 'GI must be an integer between 0 and 100',
   'error.ERR_FOOD_IN_USE': 'This food is referenced by intake logs and cannot be deleted',
   'error.ERR_INVALID_BACKUP': 'Not a valid backup file',
   'error.ERR_BACKUP_VERSION': 'Backup version not supported',

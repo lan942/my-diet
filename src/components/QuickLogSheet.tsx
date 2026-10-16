@@ -1,11 +1,12 @@
 // 快速记录抽屉：份量刻度尺 + 预设快捷片 + 餐次分段 + 实时营养预览 + Add to Today
 // 视觉沿用 EditSheet 壳：grabber + 手势下拉关闭 + 遮罩点击关闭
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Modal,
   View,
   Text,
+  ScrollView,
   Pressable,
   StyleSheet,
   Animated,
@@ -25,13 +26,6 @@ import type { FoodItem } from '../types';
 
 type MealValue = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 
-const MEAL_OPTIONS: SegmentOption<MealValue>[] = [
-  { label: t('meal.breakfast'), value: 'breakfast' },
-  { label: t('meal.lunch'), value: 'lunch' },
-  { label: t('meal.dinner'), value: 'dinner' },
-  { label: t('meal.snack'), value: 'snack' },
-];
-
 const GRAM_PRESETS = [50, 100, 150, 200];
 
 interface QuickLogSheetProps {
@@ -43,6 +37,33 @@ interface QuickLogSheetProps {
 
 const CLOSE_THRESHOLD = 120;
 
+// 模块级工厂：手势实例只创建一次。关闭判定为工厂内部插槽，
+// 由组件 effect 接线最新闭包（保证 useState initializer 内零 ref 捕获，满足 react-hooks 规则）
+function createSheetPanResponder(translateY: Animated.Value, onClose: () => void) {
+  let canCloseFn: () => boolean = () => true;
+  const pr = PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onPanResponderMove: (_, g) => {
+      if (g.dy > 0) translateY.setValue(g.dy);
+    },
+    onPanResponderRelease: (_, g) => {
+      if (canCloseFn() && (g.dy > CLOSE_THRESHOLD || g.vy > 1.2)) {
+        Animated.timing(translateY, {
+          toValue: 600,
+          duration: 180,
+          useNativeDriver: true,
+        }).start(() => {
+          translateY.setValue(0);
+          onClose();
+        });
+      } else {
+        Animated.spring(translateY, { toValue: 0, useNativeDriver: true }).start();
+      }
+    },
+  });
+  return { pr, setCanClose: (fn: () => boolean) => void (canCloseFn = fn) };
+}
+
 // 外壳：Modal + 手势下拉（与 EditSheet 同壳）；内容组件 keyed by food.id，
 // 每次打开重新挂载以重置份量/餐次（懒初始化，规避 effect setState）
 export default function QuickLogSheet({
@@ -53,44 +74,54 @@ export default function QuickLogSheet({
 }: QuickLogSheetProps) {
   const insets = useSafeAreaInsets();
   const [translateY] = useState(() => new Animated.Value(0));
-
-  // 关闭动画期间复位偏移，避免下次打开残留
+  // 保存进行中锁定关闭通道（遮罩/返回键/下拉手势），避免抽屉卸载导致失败反馈丢失
+  const [busy, setBusy] = useState(false);
+  // 手势回调在 PanResponder 创建后长期存活，用 ref 读取最新 busy（仅 effect/事件回调访问）
+  const busyRef = useRef(false);
   useEffect(() => {
-    if (!visible) translateY.setValue(0);
-  }, [visible, translateY]);
+    busyRef.current = busy;
+  }, [busy]);
 
-  const [panResponder] = useState(() =>
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onPanResponderMove: (_, g) => {
-        if (g.dy > 0) translateY.setValue(g.dy);
-      },
-      onPanResponderRelease: (_, g) => {
-        if (g.dy > CLOSE_THRESHOLD || g.vy > 1.2) {
-          Animated.timing(translateY, {
-            toValue: 600,
-            duration: 180,
-            useNativeDriver: true,
-          }).start(() => {
-            translateY.setValue(0);
-            onClose();
-          });
-        } else {
-          Animated.spring(translateY, { toValue: 0, useNativeDriver: true }).start();
-        }
-      },
-    })
-  );
+  // 关闭后复位 busy：render 期随 prop 调整 state（React 官方模式），规避 effect 级联渲染。
+  // translateY 无需复位：所有手势关闭路径均已回弹/归零，遮罩关闭时本就为 0
+  const [prevVisible, setPrevVisible] = useState(visible);
+  if (visible !== prevVisible) {
+    setPrevVisible(visible);
+    if (!visible) setBusy(false);
+  }
+
+  // 受 busy 保护的关闭入口；保存成功后代码直接调用原始 onClose 不受限
+  const guardClose = () => {
+    if (!busyRef.current) onClose();
+  };
+
+  const [sheetPan] = useState(() => createSheetPanResponder(translateY, onClose));
+  // 每次提交后接线最新 busy 判定（无状态写入，仅替换插槽函数）
+  useEffect(() => {
+    sheetPan.setCanClose(() => !busyRef.current);
+  });
+  const panResponder = sheetPan.pr;
+
+  // 外壳统一持有 busy：失败时复位并把错误抛给内容区展示
+  const handleAddLocked = async (gramsValue: number, mealValue: string) => {
+    setBusy(true);
+    try {
+      await onAdd(gramsValue, mealValue);
+    } catch (e) {
+      setBusy(false);
+      throw e;
+    }
+  };
 
   return (
     <Modal
       visible={visible && food !== null}
       transparent
       animationType="slide"
-      onRequestClose={onClose}
+      onRequestClose={guardClose}
     >
       <View style={styles.mask}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <Pressable style={StyleSheet.absoluteFill} onPress={guardClose} />
         <Animated.View
           style={[
             styles.sheet,
@@ -110,7 +141,13 @@ export default function QuickLogSheet({
           </View>
 
           {food !== null && (
-            <QuickLogBody key={food.id} food={food} onClose={onClose} onAdd={onAdd} />
+            <QuickLogBody
+              key={food.id}
+              food={food}
+              onClose={onClose}
+              onAdd={handleAddLocked}
+              busy={busy}
+            />
           )}
         </Animated.View>
       </View>
@@ -123,10 +160,12 @@ function QuickLogBody({
   food,
   onClose,
   onAdd,
+  busy,
 }: {
   food: FoodItem;
   onClose: () => void;
   onAdd: (grams: number, meal: string) => Promise<void>;
+  busy: boolean;
 }) {
   const portions = food.portions;
   const hasPortions = !!portions && portions.length > 0;
@@ -135,15 +174,21 @@ function QuickLogBody({
   const [qty, setQty] = useState(1);
   const [grams, setGrams] = useState(100);
   const [meal, setMeal] = useState<MealValue>(() => defaultMealFor(new Date()));
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  // 渲染期构造，跟随当前语言（禁止模块顶层调用 t() 固化文案）
+  const mealOptions: SegmentOption<MealValue>[] = [
+    { label: t('meal.breakfast'), value: 'breakfast' },
+    { label: t('meal.lunch'), value: 'lunch' },
+    { label: t('meal.dinner'), value: 'dinner' },
+    { label: t('meal.snack'), value: 'snack' },
+  ];
 
   const portion = hasPortions ? portions![Math.min(portionIdx, portions!.length - 1)] : null;
   const effectiveGrams = mode === 'portions' && portion ? Math.round(qty * portion.grams) : grams;
 
   async function handleAdd() {
-    if (saving) return;
-    setSaving(true);
+    if (busy) return;
     setError('');
     try {
       await onAdd(effectiveGrams, meal);
@@ -151,7 +196,6 @@ function QuickLogBody({
       onClose();
     } catch (e: unknown) {
       setError(tError(e));
-      setSaving(false);
     }
   }
 
@@ -172,10 +216,16 @@ function QuickLogBody({
   ];
 
   return (
-    <View style={styles.body}>
-      {/* 食物名 + 100g 营养摘要 */}
+    <>
+      <ScrollView
+        style={styles.body}
+        contentContainerStyle={styles.bodyContent}
+        keyboardShouldPersistTaps="handled"
+        bounces={false}
+      >
+        {/* 食物名 + 100g 营养摘要 */}
       <View style={styles.foodHead}>
-        <Text style={styles.foodName} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+        <Text style={styles.foodName} maxFontSizeMultiplier={1.4}>
           {foodDisplayName(food)}
         </Text>
         <Text style={styles.foodSub} maxFontSizeMultiplier={1.4}>
@@ -196,6 +246,8 @@ function QuickLogBody({
                 key={`${p.en}-${p.grams}`}
                 style={[styles.preset, i === portionIdx && styles.presetActive]}
                 onPress={() => pickPortion(i)}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: i === portionIdx }}
               >
                 <Text
                   style={[styles.presetText, i === portionIdx && styles.presetTextActive]}
@@ -230,6 +282,8 @@ function QuickLogBody({
                 key={v}
                 style={[styles.preset, grams === v && styles.presetActive]}
                 onPress={() => pickPreset(v)}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: grams === v }}
               >
                 <Text
                   style={[styles.presetText, grams === v && styles.presetTextActive]}
@@ -258,7 +312,7 @@ function QuickLogBody({
       <Text style={styles.mealLabel} maxFontSizeMultiplier={1.4}>
         {t('food.mealLabel')}
       </Text>
-      <SegmentedControl options={MEAL_OPTIONS} value={meal} onChange={setMeal} />
+      <SegmentedControl options={mealOptions} value={meal} onChange={setMeal} />
 
       {/* 实时营养预览 */}
       <View style={styles.preview}>
@@ -296,6 +350,8 @@ function QuickLogBody({
         </View>
       </View>
 
+      </ScrollView>
+
       {error ? (
         <Text style={styles.errorText} maxFontSizeMultiplier={1.4}>
           {error}
@@ -303,11 +359,11 @@ function QuickLogBody({
       ) : null}
 
       <Button
-        title={saving ? t('onboarding.saving') : t('food.addToToday')}
+        title={busy ? t('onboarding.saving') : t('food.addToToday')}
         onPress={handleAdd}
-        disabled={saving}
+        disabled={busy}
       />
-    </View>
+    </>
   );
 }
 
@@ -323,6 +379,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     paddingTop: spacing.sm,
     paddingHorizontal: spacing.xl,
+    maxHeight: '88%',
   },
   grabber: {
     alignSelf: 'center',
@@ -346,7 +403,10 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   body: {
-    paddingTop: spacing.sm,
+    flexGrow: 0,
+  },
+  bodyContent: {
+    paddingVertical: spacing.sm,
   },
   foodHead: {
     alignItems: 'center',
@@ -356,6 +416,8 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
     color: colors.text,
+    textAlign: 'center',
+    flexShrink: 1,
   },
   foodSub: {
     fontSize: 12,
@@ -364,6 +426,7 @@ const styles = StyleSheet.create({
   },
   presetRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.sm,
     justifyContent: 'center',
     marginBottom: spacing.sm,
@@ -371,6 +434,8 @@ const styles = StyleSheet.create({
   preset: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.xs,
+    minHeight: 44,
+    justifyContent: 'center',
     borderRadius: 14,
     backgroundColor: colors.bg,
     borderWidth: 1,
@@ -404,6 +469,7 @@ const styles = StyleSheet.create({
   },
   preview: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-around',
     backgroundColor: colors.bg,
     borderRadius: 16,
@@ -413,6 +479,7 @@ const styles = StyleSheet.create({
   },
   previewItem: {
     alignItems: 'center',
+    minWidth: '25%',
   },
   previewValue: {
     fontSize: 18,

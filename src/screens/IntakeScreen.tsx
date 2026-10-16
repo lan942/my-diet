@@ -1,12 +1,13 @@
 // 今日：选食物录克数与餐次、当日汇总、达成率、按日切换、删除记录
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   Pressable,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,11 +17,19 @@ import { Button, TextField, Row, EmptyState } from '../components/ui';
 import Toast, { useToast } from '../components/Toast';
 import DateBar from '../components/DateBar';
 import ProgressBar from '../components/ProgressBar';
-import { colors, spacing } from '../theme';
+import ActionSheet from '../components/ActionSheet';
+import { colors, spacing, macroColors, typeScale } from '../theme';
 import { useApp } from '../state/AppContext';
-import { t, tError, type TranslationKey } from '../i18n';
-import { createIntake, deleteIntake, summarizeDaily } from '../services/intakeService';
+import { t, tError, formatNumber, type TranslationKey } from '../i18n';
+import {
+  createIntake,
+  deleteIntake,
+  scaleNutrition,
+  summarizeDaily,
+} from '../services/intakeService';
 import { computeTarget } from '../services/targetService';
+import { computeEnergyBalance } from '../services/energyBalance';
+import { useDeviceSteps } from '../hooks/useDeviceSteps';
 import { foodDisplayName, isLowGI } from '../services/foodService';
 import type { DailyNutrition, TargetResult } from '../types';
 
@@ -39,9 +48,11 @@ const LEGACY_MEAL_VALUES: Record<string, string> = {
   加餐: 'snack',
 };
 
-function mealDisplayKey(value: string): TranslationKey {
+// 餐次显示文案：合法/旧值映射到翻译；未知值原样展示（不再静默兜底成午餐）
+function mealLabelText(value: string): string {
   const canonical = LEGACY_MEAL_VALUES[value] ?? value;
-  return (MEALS.find((m) => m.value === canonical)?.key ?? 'meal.lunch') as TranslationKey;
+  const key = MEALS.find((m) => m.value === canonical)?.key as TranslationKey | undefined;
+  return key ? t(key) : value;
 }
 
 export default function IntakeScreen() {
@@ -67,13 +78,66 @@ export default function IntakeScreen() {
     () => (config ? computeTarget(config) : null),
     [config]
   );
+  // 设备步数（今日页唯一步数出口：自动同步/连接状态）
+  const deviceSteps = useDeviceSteps(currentDate);
+  // 能量平衡（纯派生）：步数消耗 → 调整后热量目标 / 净热量 / 剩余
+  const balance = useMemo(() => {
+    if (!config || !target) return null;
+    return computeEnergyBalance({
+      targetKcal: target.daily_calorie,
+      intakeKcal: summary.total_kcal,
+      steps: deviceSteps.steps,
+      weightKg: config.weight_kg,
+    });
+  }, [config, target, summary.total_kcal, deviceSteps.steps]);
   const [showPicker, setShowPicker] = useState(false);
   const [formError, setFormError] = useState('');
+  const [saving, setSaving] = useState(false);
+  // 待删除记录（ActionSheet 二次确认，禁用系统 Alert）
+  const [deleteId, setDeleteId] = useState<number | null>(null);
   const { toast, toastOpacity, showToast } = useToast();
 
+  // 首次连接：唯一会触发系统健康权限弹窗的路径
+  async function handleConnectSteps() {
+    const result = await deviceSteps.connect();
+    if (result === 'denied') showToast(t('sync.denied'));
+    else if (result === 'unavailable') showToast(t('sync.unavailable'));
+  }
+
+  // 已连接后的手动刷新
+  async function handleSyncSteps() {
+    const result = await deviceSteps.syncNow();
+    if (result.ok) {
+      showToast(t('sync.success', { steps: formatNumber(result.steps) }));
+    } else {
+      showToast(
+        result.reason === 'unavailable' ? t('sync.unavailable') : t('sync.denied')
+      );
+    }
+  }
+
+  // 汇总请求序号：快速切日时旧查询后解析不得覆盖新日期汇总
+  const summarySeq = useRef(0);
   useEffect(() => {
-    summarizeDaily(currentDate).then(setSummary).catch(() => {});
+    const seq = ++summarySeq.current;
+    summarizeDaily(currentDate)
+      .then((s) => {
+        if (seq === summarySeq.current) setSummary(s);
+      })
+      .catch(() => {});
   }, [currentDate, intakeLogs]);
+
+  // 切日重置录入草稿，避免把上一日的食物/克数/餐次误提交到新日期。
+  // render 期随 prop 调整 state（React 官方模式），避免 effect 同步 setState 级联渲染
+  const [prevDate, setPrevDate] = useState(currentDate);
+  if (currentDate !== prevDate) {
+    setPrevDate(currentDate);
+    setGrams('');
+    setSelectedFoodId(null);
+    setMeal('lunch');
+    setShowPicker(false);
+    setFormError('');
+  }
 
   const logsWithNames = useMemo(() => {
     const map = new Map(foodItems.map((f) => [f.id, f]));
@@ -84,6 +148,7 @@ export default function IntakeScreen() {
   }, [intakeLogs, foodItems]);
 
   async function handleAdd() {
+    if (saving) return; // 防重入：双击/快速点按只产生一条记录
     setFormError('');
     if (!selectedFoodId) {
       setFormError(t('intake.selectFood'));
@@ -94,6 +159,7 @@ export default function IntakeScreen() {
       setFormError(t('error.ERR_INVALID_GRAMS'));
       return;
     }
+    setSaving(true);
     try {
       await createIntake({
         date: currentDate,
@@ -105,10 +171,15 @@ export default function IntakeScreen() {
       await refresh();
     } catch (e: unknown) {
       setFormError(tError(e));
+    } finally {
+      setSaving(false);
     }
   }
 
-  async function handleDelete(id: number) {
+  async function handleDeleteConfirm() {
+    if (deleteId === null) return;
+    const id = deleteId;
+    setDeleteId(null);
     try {
       await deleteIntake(id);
       await refresh();
@@ -124,6 +195,78 @@ export default function IntakeScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <DateBar date={currentDate} onChange={setCurrentDate} />
 
+        {/* 步数（设备自动同步） */}
+        <Card>
+          <View style={styles.stepsHeader}>
+            <Text style={styles.cardTitle} maxFontSizeMultiplier={1.4}>
+              {t('steps.cardTitle')}
+            </Text>
+            {deviceSteps.syncState === 'connected' ||
+            deviceSteps.syncState === 'syncing' ? (
+              <Pressable
+                onPress={handleSyncSteps}
+                style={styles.syncButton}
+                disabled={deviceSteps.syncState === 'syncing'}
+                accessibilityLabel={t('sync.button')}
+              >
+                {deviceSteps.syncState === 'syncing' ? (
+                  <ActivityIndicator size="small" color={macroColors.steps} />
+                ) : (
+                  <Ionicons name="refresh" size={18} color={macroColors.steps} />
+                )}
+              </Pressable>
+            ) : null}
+          </View>
+
+          {deviceSteps.syncState === 'unavailable' ? (
+            <Text style={styles.stepsHint} maxFontSizeMultiplier={1.4}>
+              {t('sync.unavailable')}
+            </Text>
+          ) : deviceSteps.syncState === 'not-connected' ||
+            deviceSteps.syncState === 'denied' ? (
+            <View style={styles.connectBox}>
+              <Text style={styles.stepsStatus} maxFontSizeMultiplier={1.4}>
+                {t('steps.notConnected')}
+              </Text>
+              <Text style={styles.stepsHint} maxFontSizeMultiplier={1.4}>
+                {t('sync.rationale')}
+              </Text>
+              {deviceSteps.syncState === 'denied' ? (
+                <Text style={styles.formError} maxFontSizeMultiplier={1.4}>
+                  {t('sync.denied')}
+                </Text>
+              ) : null}
+              <Button
+                title={t('steps.connect')}
+                variant="ghost"
+                onPress={handleConnectSteps}
+              />
+            </View>
+          ) : (
+            <View style={styles.stepsRow}>
+              <Ionicons name="footsteps" size={26} color={macroColors.steps} />
+              {deviceSteps.steps === null &&
+              deviceSteps.syncState === 'syncing' ? (
+                <Text style={styles.stepsSyncingText} maxFontSizeMultiplier={1.4}>
+                  {t('steps.syncing')}
+                </Text>
+              ) : (
+                <Text style={styles.stepsValue} maxFontSizeMultiplier={2}>
+                  {deviceSteps.steps === null ? '—' : formatNumber(deviceSteps.steps)}
+                </Text>
+              )}
+              <Text style={styles.stepsUnit} maxFontSizeMultiplier={1.4}>
+                {t('steps.unit')}
+              </Text>
+              <Text style={styles.stepsKcal} maxFontSizeMultiplier={1.4}>
+                {t('steps.kcalHint', {
+                  kcal: (balance?.stepsKcal ?? 0).toFixed(0),
+                })}
+              </Text>
+            </View>
+          )}
+        </Card>
+
         {/* 达成率 */}
         <Card>
           <Text style={styles.cardTitle} maxFontSizeMultiplier={1.4}>
@@ -134,7 +277,7 @@ export default function IntakeScreen() {
               <ProgressBar
                 label={t('macro.calorie')}
                 current={summary.total_kcal}
-                target={target.daily_calorie}
+                target={balance ? balance.adjustedCalorie : target.daily_calorie}
                 unit="kcal"
               />
               <ProgressBar
@@ -155,6 +298,35 @@ export default function IntakeScreen() {
                 target={target.fat_g}
                 unit="g"
               />
+              {balance ? (
+                <View style={styles.energyBox}>
+                  <View style={styles.energyRow}>
+                    <Text style={styles.energyLabel} maxFontSizeMultiplier={1.4}>
+                      {t('energy.net')}
+                    </Text>
+                    <Text style={styles.energyValue} maxFontSizeMultiplier={1.4}>
+                      {balance.netKcal.toFixed(0)} kcal
+                    </Text>
+                    <Text style={styles.energyLabel} maxFontSizeMultiplier={1.4}>
+                      {t('energy.remaining')}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.energyValue,
+                        balance.remaining < 0 && styles.energyOver,
+                      ]}
+                      maxFontSizeMultiplier={1.4}
+                    >
+                      {balance.remaining.toFixed(0)} kcal
+                    </Text>
+                  </View>
+                  {balance.stepsKcal > 0 ? (
+                    <Text style={styles.energyHint} maxFontSizeMultiplier={1.4}>
+                      {t('energy.adjustedHint')} · {balance.adjustedCalorie.toFixed(0)} kcal
+                    </Text>
+                  ) : null}
+                </View>
+              ) : null}
             </>
           ) : (
             <Text style={styles.emptyHint} maxFontSizeMultiplier={1.4}>
@@ -171,6 +343,9 @@ export default function IntakeScreen() {
           <Pressable
             onPress={() => setShowPicker((v) => !v)}
             style={styles.foodSelector}
+            accessibilityRole="button"
+            accessibilityLabel={t('intake.selectFood')}
+            accessibilityState={{ expanded: showPicker }}
           >
             <Text style={selectedFood ? styles.foodSelected : styles.foodPlaceholder} maxFontSizeMultiplier={1.4}>
               {selectedFood
@@ -232,6 +407,8 @@ export default function IntakeScreen() {
                 key={m.value}
                 style={[styles.mealChip, meal === m.value && styles.mealChipActive]}
                 onPress={() => setMeal(m.value)}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: meal === m.value }}
               >
                 <Text style={[styles.mealText, meal === m.value && styles.mealTextActive]} maxFontSizeMultiplier={1.4}>
                   {t(m.key)}
@@ -244,7 +421,11 @@ export default function IntakeScreen() {
               {formError}
             </Text>
           ) : null}
-          <Button title={t('intake.add')} onPress={handleAdd} />
+          <Button
+            title={saving ? t('onboarding.saving') : t('intake.add')}
+            onPress={handleAdd}
+            disabled={saving}
+          />
         </Card>
 
         {/* 当日摄入列表 */}
@@ -256,8 +437,7 @@ export default function IntakeScreen() {
             <EmptyState text={t('intake.emptyLog')} />
           ) : (
             logsWithNames.map((l) => {
-              const factor = l.grams / 100;
-              const kcal = (l.food?.kcal_per_100g ?? 0) * factor;
+              const kcal = l.food ? scaleNutrition(l.food, l.grams).kcal : 0;
               return (
                 <Row
                   key={l.id}
@@ -267,12 +447,17 @@ export default function IntakeScreen() {
                         {l.food ? foodDisplayName(l.food) : t('intake.deletedFood')} · {l.grams.toFixed(0)}g
                       </Text>
                       <Text style={styles.logMeta} maxFontSizeMultiplier={1.4}>
-                        {t(mealDisplayKey(l.meal))} · {kcal.toFixed(1)} kcal
+                        {mealLabelText(l.meal)} · {kcal.toFixed(1)} kcal
                       </Text>
                     </View>
                   }
                   right={
-                    <Pressable onPress={() => handleDelete(l.id)} hitSlop={8}>
+                    <Pressable
+                      onPress={() => setDeleteId(l.id)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${t('common.delete')} ${l.food ? foodDisplayName(l.food) : t('intake.deletedFood')}`}
+                      style={styles.iconButton}
+                    >
                       <Ionicons name="trash-outline" size={18} color={colors.danger} />
                     </Pressable>
                   }
@@ -285,6 +470,17 @@ export default function IntakeScreen() {
 
       {/* 轻提示（删除失败等非阻塞反馈） */}
       <Toast message={toast} opacity={toastOpacity} />
+
+      {/* 删除摄入二次确认（自定义抽屉，禁系统 Alert） */}
+      <ActionSheet
+        visible={deleteId !== null}
+        title={t('intake.deleteTitle')}
+        message={t('intake.deleteMsg')}
+        confirmLabel={t('common.delete')}
+        confirmDanger
+        onConfirm={handleDeleteConfirm}
+        onClose={() => setDeleteId(null)}
+      />
     </SafeAreaView>
   );
 }
@@ -301,10 +497,103 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   cardTitle: {
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: typeScale.body + 1,
+    fontWeight: '700',
     color: colors.text,
     marginBottom: spacing.sm,
+  },
+  stepsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  syncButton: {
+    width: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 22,
+    backgroundColor: colors.accentSoft,
+  },
+  stepsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flexWrap: 'wrap',
+    paddingVertical: spacing.xs,
+  },
+  stepsValue: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: macroColors.steps,
+  },
+  stepsUnit: {
+    fontSize: 13,
+    color: colors.muted,
+  },
+  stepsKcal: {
+    fontSize: 13,
+    color: colors.muted,
+    marginLeft: 'auto',
+  },
+  iconButton: {
+    width: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 22,
+    backgroundColor: '#fbefee',
+  },
+  stepsHint: {
+    fontSize: 12,
+    color: colors.muted,
+    lineHeight: 18,
+    textAlign: 'center',
+  },
+  stepsStatus: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: macroColors.steps,
+  },
+  stepsSyncingText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.muted,
+  },
+  connectBox: {
+    gap: spacing.sm,
+    alignItems: 'center',
+  },
+  energyBox: {
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.line,
+  },
+  energyRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  energyLabel: {
+    fontSize: 12,
+    color: colors.muted,
+  },
+  energyValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  energyOver: {
+    color: colors.danger,
+  },
+  energyHint: {
+    fontSize: 11,
+    color: colors.muted,
+    marginTop: spacing.xs,
+    textAlign: 'right',
   },
   emptyHint: {
     color: colors.muted,
@@ -318,6 +607,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.line,
     borderRadius: 8,
+    minHeight: 48,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     marginBottom: spacing.sm,
@@ -343,11 +633,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
+    minHeight: 44,
     borderBottomWidth: 1,
     borderBottomColor: colors.line,
   },
   pickerItemActive: {
-    backgroundColor: '#eff6ff',
+    backgroundColor: colors.accentSoft,
   },
   pickerItemText: {
     fontSize: 14,
@@ -367,12 +658,15 @@ const styles = StyleSheet.create({
   },
   mealRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.sm,
     marginBottom: spacing.md,
   },
   mealChip: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
+    minHeight: 44,
+    justifyContent: 'center',
     borderRadius: 16,
     backgroundColor: colors.card,
     borderWidth: 1,

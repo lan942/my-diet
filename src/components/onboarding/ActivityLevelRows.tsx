@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
   },
   cardActive: {
     borderColor: colors.accent,
-    backgroundColor: '#2563eb14',
+    backgroundColor: colors.accentSoft,
   },
   levelBody: {
     flex: 1,

@@ -2,15 +2,16 @@
 // 模块缺失（未编译进原生工程）时自动降级为不可用
 
 import { requireOptionalNativeModule } from 'expo-modules-core';
-import type {
-  PlatformSteps,
-  PlatformStepsAvailability,
-} from './platformSteps';
+import { todayString } from '../db/database';
+import type { PlatformSteps, PlatformStepsAvailability } from './platformSteps';
 
 interface NutriPulseHealthModule {
   availability: () => string;
   requestPermissions: () => Promise<boolean>;
+  // 旧原生包仅有读当日方法
   readTodaySteps: () => Promise<number | null>;
+  // 新原生包支持任意日期（YYYY-MM-DD）
+  readStepsForDate?: (date: string) => Promise<number | null>;
 }
 
 // requireOptionalNativeModule 在模块未注册时返回 null（而不是抛错）
@@ -38,9 +39,17 @@ export const platformSteps: PlatformSteps = native
           return false;
         }
       },
-      readTodaySteps: async () => {
+      readStepsForDate: async (date: string) => {
         try {
-          return await native.readTodaySteps();
+          // 新原生包：任意日期直接读
+          if (typeof native.readStepsForDate === 'function') {
+            return await native.readStepsForDate(date);
+          }
+          // 旧原生包降级：仅当日可回退 readTodaySteps，历史日期无法读取
+          if (date === todayString()) {
+            return await native.readTodaySteps();
+          }
+          return null;
         } catch {
           return null;
         }
@@ -50,7 +59,7 @@ export const platformSteps: PlatformSteps = native
       // 原生模块未链接（如 Expo Go / 未重新 prebuild）：走纯 TS 降级
       availability: async () => 'unavailable',
       requestPermissions: async () => false,
-      readTodaySteps: async () => null,
+      readStepsForDate: async () => null,
     };
 
 export default platformSteps;

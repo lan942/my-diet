@@ -1,0 +1,42 @@
+# app-bootstrap Specification
+
+## Purpose
+TBD - created by archiving change harden-reliability. Update Purpose after archive.
+## Requirements
+### Requirement: 首启加载失败可重试
+应用 SHALL 在首启引导数据加载（配置、种子、食物库、当日摄入、步数）失败且本地尚不存在配置时，展示全屏错误态与「重试」按钮，SHALL NOT 停留在永久白屏；用户点击重试 SHALL 复位种子初始化缓存并重新执行完整加载。已存在配置后的后台刷新失败 SHALL NOT 进入全屏错误态，而是保留屏幕上已有数据并由触发方反馈。
+
+#### Scenario: 首启数据库打开失败
+- **WHEN** 全新安装后首次启动，数据库打开/建表阶段失败
+- **THEN** 应用展示错误屏与「重试」按钮，而非白屏或无限转圈
+
+#### Scenario: 重试后成功进入主界面
+- **WHEN** 用户在错误屏点击「重试」且本次加载成功
+- **THEN** 应用正常进入主界面，错误屏消失
+
+#### Scenario: 已有配置时刷新失败不夺屏
+- **WHEN** 用户正常使用中某次后台刷新失败（本地已有配置）
+- **THEN** 不展示全屏错误屏，页面保留旧数据，失败由触发处提示
+
+### Requirement: 后台数据刷新竞态安全
+全局数据加载 SHALL 携带单调递增的序号令牌：加载发起时捕获序号，结果返回时若序号已过期（期间发生过日期切换等新加载）SHALL 丢弃该结果，SHALL NOT 覆盖更新日期的页面数据。原地刷新 SHALL NOT 切换全屏 loading 状态，避免导航树卸载重挂后跳回初始 Tab。
+
+#### Scenario: 快速切日过期结果被丢弃
+- **WHEN** 用户从 A 日快速切到 B 日，A 日的加载结果晚于 B 日返回
+- **THEN** 页面仍展示 B 日数据，A 日结果被丢弃
+
+#### Scenario: 保存触发刷新不跳 Tab
+- **WHEN** 用户在非首屏 Tab 保存记录触发原地刷新
+- **THEN** 停留在当前 Tab，不跳回第一个 Tab
+
+### Requirement: 初始化失败不缓存失败状态
+数据库连接（打开 + WAL + 建表 + 迁移）与种子数据初始化（分类、食物）SHALL 以单例 Promise 缓存成功结果，但失败时 SHALL 复位缓存，使后续调用重新尝试，SHALL NOT 在应用进程生命周期内永久缓存 rejected 状态。
+
+#### Scenario: 数据库首次打开失败后再次可用
+- **WHEN** 首次 getDb 失败，故障恢复后再次触发数据访问
+- **THEN** 系统重新打开数据库并正常建表，无需重启应用
+
+#### Scenario: 种子播种失败后重试
+- **WHEN** 首次种子写入中途失败，用户随后重试首启加载
+- **THEN** 种子流程从头重新执行并成功
+

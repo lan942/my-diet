@@ -1,6 +1,6 @@
 // 食物库重构测试：种子数据集完整性、foodTags 派生、filterFoods 搜索、Quick Log 纯逻辑
 
-import { vi, describe, it, expect } from 'vitest';
+import { vi, describe, it, expect, afterEach } from 'vitest';
 
 vi.mock('../src/db/database', () => ({
   getDb: vi.fn(),
@@ -11,6 +11,8 @@ vi.mock('../src/db/database', () => ({
 import {
   SEED_FOODS,
   SEED_CATEGORIES,
+  ensureSeedFoods,
+  PORTION_BACKFILL_V180,
   foodTags,
   filterFoods,
   foodDisplayName,
@@ -19,8 +21,11 @@ import {
   parsePortions,
   canonicalCatKind,
 } from '../src/services/foodService';
+import { getDb } from '../src/db/database';
 import { defaultMealFor, scaleNutrition } from '../src/services/intakeService';
 import type { FoodItem } from '../src/types';
+
+const mockedGetDb = vi.mocked(getDb);
 
 function fixture(partial: Partial<FoodItem>): FoodItem {
   return {
@@ -42,9 +47,9 @@ function fixture(partial: Partial<FoodItem>): FoodItem {
 }
 
 describe('种子数据集完整性（精选高营养密度数据集）', () => {
-  it('约 25 条食物（24-27 之间）', () => {
-    expect(SEED_FOODS.length).toBeGreaterThanOrEqual(24);
-    expect(SEED_FOODS.length).toBeLessThanOrEqual(27);
+  it('约 33 条食物（31-36 之间）', () => {
+    expect(SEED_FOODS.length).toBeGreaterThanOrEqual(31);
+    expect(SEED_FOODS.length).toBeLessThanOrEqual(36);
   });
 
   it('每条种子均有营养亮点备注', () => {
@@ -94,6 +99,26 @@ describe('种子数据集完整性（精选高营养密度数据集）', () => {
         expect(s.category_zh).toBe('碳水');
       }
     }
+  });
+
+  it('白米饭：碳水分类熟重口径，gi=73', () => {
+    const rice = SEED_FOODS.find((s) => s.zh === '白米饭')!;
+    expect(rice).toBeDefined();
+    expect(rice.en).toBe('White Rice (Cooked)');
+    expect(rice.category_zh).toBe('碳水');
+    expect([rice.kcal, rice.protein, rice.fat, rice.carb]).toEqual([116, 2.6, 0.3, 25.9]);
+    expect(rice.gi).toBe(73);
+  });
+
+  it('鹰嘴豆：膳食纤维分类熟重口径，无 gi 字段', () => {
+    const chickpea = SEED_FOODS.find((s) => s.zh === '鹰嘴豆')!;
+    expect(chickpea).toBeDefined();
+    expect(chickpea.en).toBe('Chickpeas (Cooked)');
+    expect(chickpea.category_zh).toBe('膳食纤维');
+    expect([chickpea.kcal, chickpea.protein, chickpea.fat, chickpea.carb]).toEqual([
+      164, 8.9, 2.6, 27.4,
+    ]);
+    expect(chickpea.gi).toBeUndefined();
   });
 });
 
@@ -250,6 +275,20 @@ describe('生活化份量（Household Portions）', () => {
     expect(chicken.portions![0].en).toBe('1 Palm');
   });
 
+  it('白米饭预设锚点为半碗 75g 与一碗 150g（熟）', () => {
+    const rice = SEED_FOODS.find((s) => s.zh === '白米饭')!;
+    expect(rice.portions!.map((p) => p.grams)).toEqual([75, 150]);
+    expect(rice.portions!.map((p) => p.zh)).toEqual(['1/2 碗（熟）', '1 碗（熟）']);
+    expect(rice.portions!.map((p) => p.en)).toEqual(['1/2 Bowl Cooked', '1 Bowl Cooked']);
+  });
+
+  it('鹰嘴豆预设锚点为半杯 80g 与一杯 160g（熟）', () => {
+    const chickpea = SEED_FOODS.find((s) => s.zh === '鹰嘴豆')!;
+    expect(chickpea.portions!.map((p) => p.grams)).toEqual([80, 160]);
+    expect(chickpea.portions!.map((p) => p.zh)).toEqual(['1/2 杯（熟）', '1 杯（熟）']);
+    expect(chickpea.portions!.map((p) => p.en)).toEqual(['1/2 Cup Cooked', '1 Cup Cooked']);
+  });
+
   it('parsePortions 合法 JSON 解析、非法回退 null', () => {
     const ok = JSON.stringify([{ zh: '1 片', en: '1 Slice', grams: 35 }]);
     expect(parsePortions(ok)).toEqual([{ zh: '1 片', en: '1 Slice', grams: 35 }]);
@@ -301,5 +340,134 @@ describe('Quick Log 纯逻辑', () => {
     );
     expect(scaled.kcal).toBeCloseTo(389, 2);
     expect(scaled.protein).toBeCloseTo(16.9, 2);
+  });
+});
+
+// 升级补齐：mock db（getAllAsync 按表名分流；runAsync 捕获 INSERT，并按真实
+// WHERE 语义模拟 portions 回填 UPDATE：name 命中且 portions IS NULL 才写行）
+interface MockFoodRow {
+  name: string;
+  name_en: string | null;
+  portions: string | null;
+}
+
+function officialRow(zh: string): MockFoodRow {
+  const seed = SEED_FOODS.find((s) => s.zh === zh);
+  return { name: zh, name_en: seed?.en ?? null, portions: null };
+}
+
+function makeMockDb(opts: { rows: MockFoodRow[]; categories?: 'full' | 'none' }) {
+  const inserts: unknown[][] = [];
+  const updates: unknown[][] = [];
+  const rows = opts.rows.map((r) => ({ ...r }));
+  const db = {
+    getAllAsync: vi.fn(async (sql: string) => {
+      if (sql.includes('food_category')) {
+        return opts.categories === 'none'
+          ? []
+          : SEED_CATEGORIES.map((c) => ({ id: c.order, name: c.zh, sort_order: c.order }));
+      }
+      return rows;
+    }),
+    runAsync: vi.fn(async (sql: string, params: unknown[]) => {
+      if (sql.trimStart().startsWith('INSERT')) {
+        inserts.push(params);
+      } else {
+        updates.push(params);
+        // 模拟 UPDATE ... WHERE name = ? AND portions IS NULL
+        const [portionJson, name] = params as [string, string];
+        for (const r of rows) {
+          if (r.name === name && r.portions === null) r.portions = portionJson;
+        }
+      }
+      return { lastInsertRowId: 1, changes: 1 };
+    }),
+  };
+  return { db, inserts, updates, rows };
+}
+
+describe('ensureSeedFoods 种子升级补齐', () => {
+  afterEach(() => {
+    mockedGetDb.mockReset();
+  });
+
+  it('PORTION_BACKFILL_V180 冻结快照：16 个名字全部命中现存种子，且不含新种子', () => {
+    const byZh = new Map(SEED_FOODS.map((s) => [s.zh, s]));
+    expect(PORTION_BACKFILL_V180.size).toBe(16);
+    for (const name of PORTION_BACKFILL_V180) {
+      const seed = byZh.get(name);
+      expect(seed).toBeDefined();
+      expect(seed!.portions).not.toBeNull();
+    }
+    expect(PORTION_BACKFILL_V180.has('白米饭')).toBe(false);
+    expect(PORTION_BACKFILL_V180.has('鹰嘴豆')).toBe(false);
+  });
+
+  it('旧库缺失新种子时幂等插入白米饭与鹰嘴豆，历史种子 portions 回填仍执行', async () => {
+    const oldNames = SEED_FOODS.map((s) => s.zh).filter(
+      (n) => n !== '白米饭' && n !== '鹰嘴豆'
+    );
+    const { db, inserts, updates, rows } = makeMockDb({ rows: oldNames.map(officialRow) });
+    mockedGetDb.mockResolvedValue(db as never);
+
+    await ensureSeedFoods();
+
+    expect(inserts).toHaveLength(2);
+    const riceInsert = inserts.find((p) => p[0] === '白米饭')!;
+    const chickpeaInsert = inserts.find((p) => p[0] === '鹰嘴豆')!;
+    expect(riceInsert).toBeDefined();
+    expect(chickpeaInsert).toBeDefined();
+    // category_id：碳水 order=1，膳食纤维 order=5
+    expect(riceInsert[2]).toBe(1);
+    expect(chickpeaInsert[2]).toBe(5);
+    // gi（参数位 7）与 portions JSON（参数位 10）
+    expect(riceInsert[7]).toBe(73);
+    expect(JSON.parse(riceInsert[10] as string).map((p: { grams: number }) => p.grams)).toEqual([
+      75, 150,
+    ]);
+    expect(chickpeaInsert[7]).toBeNull();
+    expect(
+      JSON.parse(chickpeaInsert[10] as string).map((p: { grams: number }) => p.grams)
+    ).toEqual([80, 160]);
+    // 回填 UPDATE 只针对 16 个历史种子（库中存在）；新种子不产生空转 UPDATE
+    expect(updates).toHaveLength(16);
+    expect(updates.every((p) => p[1] !== '白米饭' && p[1] !== '鹰嘴豆')).toBe(true);
+    // 16 个历史官方行被真实回填
+    expect(rows.filter((r) => r.portions !== null)).toHaveLength(16);
+  });
+
+  it('用户已自建同名「白米饭/鹰嘴豆」时跳过插入，且 portions 不被注入', async () => {
+    // 全部 28 个 canonical 名均在库；其中两个新名字是用户自建行（name_en 为空）
+    const rows = SEED_FOODS.map((s) =>
+      s.zh === '白米饭' || s.zh === '鹰嘴豆'
+        ? { name: s.zh, name_en: null, portions: null }
+        : officialRow(s.zh)
+    );
+    const { db, inserts, updates, rows: mutatedRows } = makeMockDb({ rows });
+    mockedGetDb.mockResolvedValue(db as never);
+
+    await ensureSeedFoods();
+
+    // 不插入任何新种子
+    expect(inserts).toHaveLength(0);
+    // 回填仅限 16 个历史名字，不含两个新名字
+    expect(updates.every((p) => p[1] !== '白米饭' && p[1] !== '鹰嘴豆')).toBe(true);
+    // 用户自建行原样保留：portions 仍为 NULL（Quick Log 不会被切成份量模式）
+    const userRice = mutatedRows.find((r) => r.name === '白米饭')!;
+    const userChickpea = mutatedRows.find((r) => r.name === '鹰嘴豆')!;
+    expect(userRice.portions).toBeNull();
+    expect(userChickpea.portions).toBeNull();
+  });
+
+  it('分类缺失时升级补齐跳过该条且不抛错', async () => {
+    const oldNames = SEED_FOODS.map((s) => s.zh).filter(
+      (n) => n !== '白米饭' && n !== '鹰嘴豆'
+    );
+    const { db, inserts } = makeMockDb({ rows: oldNames.map(officialRow), categories: 'none' });
+    mockedGetDb.mockResolvedValue(db as never);
+
+    await expect(ensureSeedFoods()).resolves.toBeUndefined();
+    // 升级路径：2 条缺失种子均无法定位分类 → 0 插入
+    expect(inserts).toHaveLength(0);
   });
 });

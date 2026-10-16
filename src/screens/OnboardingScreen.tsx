@@ -23,11 +23,8 @@ import { Button } from '../components/ui';
 import { colors, spacing, macroColors, cardShadow } from '../theme';
 import { useApp } from '../state/AppContext';
 import { t, tError, type TranslationKey } from '../i18n';
-import {
-  computeBmr,
-  computeTdee,
-  type GoalPreset,
-} from '../services/targetService';
+import { computeTarget, type GoalPreset } from '../services/targetService';
+import { DEFAULT_CONFIG } from '../services/configStore';
 import type { Gender, UnitSystem } from '../types';
 
 const STEP_TITLES: TranslationKey[] = [
@@ -59,17 +56,28 @@ export default function OnboardingScreen() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
 
-  // 完成弹窗预览目标（基于当前草稿）
+  // 完成弹窗预览目标：以草稿构造配置，统一走 computeTarget（禁止页面内重算 BMR/TDEE）
   const preview = useMemo(() => {
     if (!goal) return null;
-    const tdee = computeTdee(computeBmr(gender, weightKg, heightCm, age), activityFactor);
+    const target = computeTarget({
+      ...DEFAULT_CONFIG,
+      gender,
+      age,
+      height_cm: heightCm,
+      weight_kg: weightKg,
+      activity_factor: activityFactor,
+      protein_ratio: goal.protein,
+      fat_ratio: goal.fat,
+      carb_ratio: goal.carb,
+      unit_system: unit,
+    });
     return {
-      tdee,
-      protein: (tdee * goal.protein) / 4,
-      fat: (tdee * goal.fat) / 9,
-      carb: (tdee * goal.carb) / 4,
+      tdee: target.daily_calorie,
+      protein: target.protein_g,
+      fat: target.fat_g,
+      carb: target.carb_g,
     };
-  }, [goal, gender, weightKg, heightCm, age, activityFactor]);
+  }, [goal, gender, weightKg, heightCm, age, activityFactor, unit]);
 
   const canNext = step === 1 ? goal !== null : true;
 

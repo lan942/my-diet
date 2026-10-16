@@ -1,4 +1,5 @@
-// 每日步数记录（manual=手动录入 / platform=健康平台同步）
+// 每日步数记录：设备平台（Health Connect/HealthKit）为唯一权威数据源。
+// 升级遗留的 manual 行只读保留，被平台读取覆盖后转为 platform。
 
 import { getDb, nowString } from '../db/database';
 import { BizError, ERR } from './errors';
@@ -41,65 +42,43 @@ export async function getStepByDate(date: string): Promise<StepLog | null> {
   return row ? mapRow(row) : null;
 }
 
-// 手动录入：始终覆盖（用户明确意图）
-export async function upsertStep(date: string, steps: number): Promise<StepLog> {
-  return upsertStepInternal(date, steps, 'manual');
-}
-
-async function upsertStepInternal(
+// 平台同步写入：平台值是该日唯一权威值，无条件覆盖（含旧 manual 行与数值下降场景）。
+// SELECT→UPDATE/INSERT 包在单事务内，并发竞态时整体回滚而非产生重复行。
+export async function recordPlatformSteps(
   date: string,
-  steps: number,
-  source: StepSource
+  steps: number
 ): Promise<StepLog> {
   if (!isFinite(steps) || steps < 0) {
     throw new StepError(ERR.INVALID_STEPS);
   }
   const db = await getDb();
-  const existing = await db.getFirstAsync<Row>(
-    'SELECT * FROM step_log WHERE date = ?',
-    [date]
-  );
-  const time = nowString();
-  if (existing) {
-    await db.runAsync(
-      'UPDATE step_log SET steps = ?, source = ?, created_at = ? WHERE id = ?',
-      [steps, source, time, existing.id]
+  let result!: StepLog;
+  await db.withTransactionAsync(async () => {
+    const existing = await db.getFirstAsync<Row>(
+      'SELECT * FROM step_log WHERE date = ?',
+      [date]
     );
-    return { id: existing.id, date, steps, source, created_at: time };
-  }
-  const res = await db.runAsync(
-    'INSERT INTO step_log (date, steps, source, created_at) VALUES (?, ?, ?, ?)',
-    [date, steps, source, time]
-  );
-  return {
-    id: Number(res.lastInsertRowId),
-    date,
-    steps,
-    source,
-    created_at: time,
-  };
-}
-
-// 平台同步：不覆盖当日 manual 记录；platform 记录取较大值（当日聚合只会增多）
-// 返回 null 表示被 manual 记录保护跳过
-export async function syncPlatformSteps(
-  date: string,
-  steps: number
-): Promise<StepLog | null> {
-  if (!isFinite(steps) || steps < 0) {
-    throw new StepError(ERR.INVALID_STEPS);
-  }
-  const existing = await getStepByDate(date);
-  if (existing && existing.source === 'manual') {
-    return null;
-  }
-  if (existing && steps <= existing.steps) {
-    return existing; // 平台值未增长，无需写库
-  }
-  return upsertStepInternal(date, steps, 'platform');
-}
-
-// 步数估算消耗热量：每步约 0.04 kcal
-export function stepsToKcal(steps: number): number {
-  return steps * 0.04;
+    const time = nowString();
+    const source: StepSource = 'platform';
+    if (existing) {
+      await db.runAsync(
+        'UPDATE step_log SET steps = ?, source = ?, created_at = ? WHERE id = ?',
+        [steps, source, time, existing.id]
+      );
+      result = { id: existing.id, date, steps, source, created_at: time };
+      return;
+    }
+    const res = await db.runAsync(
+      'INSERT INTO step_log (date, steps, source, created_at) VALUES (?, ?, ?, ?)',
+      [date, steps, source, time]
+    );
+    result = {
+      id: Number(res.lastInsertRowId),
+      date,
+      steps,
+      source,
+      created_at: time,
+    };
+  });
+  return result;
 }

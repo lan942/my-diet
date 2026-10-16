@@ -22,7 +22,7 @@ import GoalPresetCards from '../components/onboarding/GoalPresetCards';
 import BodyMetricsRulers from '../components/onboarding/BodyMetricsRulers';
 import GenderOptionCards from '../components/onboarding/GenderOptionCards';
 import ActivityLevelRows from '../components/onboarding/ActivityLevelRows';
-import { colors, spacing, macroColors, cardShadow } from '../theme';
+import { cardShadow, colors, macroColors, radius, spacing, typeScale } from '../theme';
 import { useApp } from '../state/AppContext';
 import { t, tError, formatNumber, type TranslationKey } from '../i18n';
 import {
@@ -232,7 +232,7 @@ export default function ProfileScreen() {
           title={t('settings.card.goal')}
           onEdit={() => openSheet('goal')}
         >
-          <Text style={styles.summary} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+          <Text style={styles.summary} maxFontSizeMultiplier={1.4}>
             {goalLabel} •{' '}
             {target ? (
               <AnimatedNumber
@@ -250,7 +250,7 @@ export default function ProfileScreen() {
           title={t('settings.card.bodyMetrics')}
           onEdit={() => openSheet('body')}
         >
-          <Text style={styles.summary} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+          <Text style={styles.summary} maxFontSizeMultiplier={1.4}>
             {bodySummary}
           </Text>
         </SummaryCard>
@@ -261,7 +261,7 @@ export default function ProfileScreen() {
           title={t('settings.card.biologicalSex')}
           onEdit={() => openSheet('gender')}
         >
-          <Text style={styles.summary} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+          <Text style={styles.summary} maxFontSizeMultiplier={1.4}>
             {genderSummary}
           </Text>
         </SummaryCard>
@@ -272,7 +272,7 @@ export default function ProfileScreen() {
           title={t('settings.card.activityLevel')}
           onEdit={() => openSheet('activity')}
         >
-          <Text style={styles.summary} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+          <Text style={styles.summary} maxFontSizeMultiplier={1.4}>
             {activitySummary}
           </Text>
         </SummaryCard>
@@ -283,9 +283,11 @@ export default function ProfileScreen() {
         </Text>
 
         <View style={[styles.prefsCard, cardShadow]}>
-          <View style={styles.prefRow}>
-            <View style={styles.prefBody}>
-              <Text style={styles.prefTitle} maxFontSizeMultiplier={1.4}>
+          {/* 单位行：标题与分段控件上下堆叠，保证两个选项在窄屏也单行不换行 */}
+          <View style={styles.unitBlock}>
+            <View style={styles.unitHead}>
+              <Ionicons name="scale-outline" size={20} color={colors.text} />
+              <Text style={[styles.prefTitle, styles.unitHeadTitle]} maxFontSizeMultiplier={1.4}>
                 {t('settings.unit')}
               </Text>
             </View>
@@ -528,7 +530,8 @@ function SummaryCard({
           </Text>
           <Pressable
             style={styles.editBtn}
-            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={`${t('settings.edit')} ${title}`}
             onPress={onEdit}
           >
             <Text style={styles.editText} maxFontSizeMultiplier={1.4}>
@@ -559,7 +562,12 @@ function PrefsRow({
 }) {
   const color = danger ? colors.danger : colors.text;
   return (
-    <Pressable style={({ pressed }) => [styles.prefRow, pressed && { opacity: 0.6 }]} onPress={onPress}>
+    <Pressable
+      style={({ pressed }) => [styles.prefRow, pressed && { opacity: 0.6 }]}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${title}. ${sub}`}
+    >
       <Ionicons name={icon} size={20} color={color} />
       <View style={styles.prefBody}>
         <Text style={[styles.prefTitle, { color }]} maxFontSizeMultiplier={1.4}>
@@ -599,7 +607,7 @@ const styles = StyleSheet.create({
   summaryCard: {
     flexDirection: 'row',
     backgroundColor: colors.card,
-    borderRadius: 16,
+    borderRadius: radius.md,
     marginBottom: spacing.sm,
     overflow: 'hidden',
   },
@@ -613,7 +621,7 @@ const styles = StyleSheet.create({
   },
   cardTitleRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   cardIndex: {
     fontSize: 13,
@@ -622,7 +630,7 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     flex: 1,
-    fontSize: 15,
+    fontSize: typeScale.body,
     fontWeight: '600',
     color: colors.text,
   },
@@ -630,6 +638,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginLeft: spacing.sm,
+    minHeight: 44,
+    paddingLeft: spacing.xs,
   },
   editText: {
     fontSize: 13,
@@ -643,7 +653,7 @@ const styles = StyleSheet.create({
   },
   prefsCard: {
     backgroundColor: colors.card,
-    borderRadius: 16,
+    borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.xs,
   },
@@ -668,8 +678,20 @@ const styles = StyleSheet.create({
     color: colors.muted,
     marginTop: 2,
   },
+  unitBlock: {
+    paddingVertical: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.line,
+  },
+  unitHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  unitHeadTitle: {
+    marginLeft: spacing.md,
+  },
   unitSeg: {
-    width: 210,
+    marginTop: spacing.sm,
   },
   disclaimer: {
     fontSize: 11,

@@ -1,12 +1,14 @@
 // 颜色与间距（浅色主题）
 
 export const colors = {
-  bg: '#f5f6f8',
+  bg: '#f4f7f4',
   card: '#ffffff',
-  line: '#e3e6ea',
-  text: '#1f2329',
-  muted: '#6b7280',
-  accent: '#2563eb',
+  line: '#e2e9e3',
+  text: '#1e2b24',
+  muted: '#68766d',
+  accent: '#34785b',
+  accentSoft: '#e7f2eb',
+  surfaceSoft: '#f8faf8',
   // 达成率
   ok: '#16a34a',
   warn: '#f59e0b',
@@ -19,6 +21,20 @@ export const spacing = {
   md: 12,
   lg: 16,
   xl: 20,
+};
+
+export const radius = {
+  sm: 10,
+  md: 16,
+  lg: 22,
+  pill: 999,
+};
+
+export const typeScale = {
+  caption: 12,
+  body: 15,
+  title: 18,
+  heading: 22,
 };
 
 // 宏量营养素专属语义色：环形图/进度条/目标卡全局统一
@@ -50,9 +66,9 @@ export const darkColors = {
 
 // 卡片微投影（Modern & Premium Soft Card）
 export const cardShadow = {
-  shadowColor: '#000000',
-  shadowOpacity: 0.04,
-  shadowRadius: 12,
-  shadowOffset: { width: 0, height: 4 },
+  shadowColor: '#254a35',
+  shadowOpacity: 0.06,
+  shadowRadius: 16,
+  shadowOffset: { width: 0, height: 6 },
   elevation: 2,
 };

@@ -40,16 +40,37 @@ function friendly(date: string): string {
 }
 
 export default function DateBar({ date, onChange }: DateBarProps) {
+  // 不允许进入未来日期（摄入/步数均按所选日期落库）
+  const atToday = isToday(date);
   return (
     <View style={styles.bar}>
-      <Pressable onPress={() => onChange(shift(date, -1))} hitSlop={8}>
+      <Pressable
+        onPress={() => onChange(shift(date, -1))}
+        accessibilityRole="button"
+        accessibilityLabel={t('date.previous')}
+        style={({ pressed }) => [styles.arrowButton, pressed && styles.arrowPressed]}
+      >
         <Ionicons name="chevron-back" size={22} color={colors.accent} />
       </Pressable>
       <Text style={styles.label} maxFontSizeMultiplier={1.4}>
         {friendly(date)}
       </Text>
-      <Pressable onPress={() => onChange(shift(date, 1))} hitSlop={8}>
-        <Ionicons name="chevron-forward" size={22} color={colors.accent} />
+      <Pressable
+        onPress={() => {
+          if (!atToday) onChange(shift(date, 1));
+        }}
+        hitSlop={8}
+        disabled={atToday}
+        accessibilityRole="button"
+        accessibilityLabel={t('date.next')}
+        accessibilityState={{ disabled: atToday }}
+        style={({ pressed }) => [styles.arrowButton, pressed && !atToday && styles.arrowPressed]}
+      >
+        <Ionicons
+          name="chevron-forward"
+          size={22}
+          color={atToday ? colors.muted : colors.accent}
+        />
       </Pressable>
     </View>
   );
@@ -61,6 +82,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing.sm,
+  },
+  arrowButton: {
+    width: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 22,
+    backgroundColor: colors.card,
+  },
+  arrowPressed: {
+    opacity: 0.65,
   },
   label: {
     fontSize: 16,

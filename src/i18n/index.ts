@@ -33,11 +33,13 @@ export function intlLocale(): string {
 
 /** 翻译：{param} 占位符插值；缺 key 时回退 en，仍缺失则返回 key 本身 */
 export function t(key: TranslationKey, params?: TranslationParams): string {
-  const dict = DICTS[currentLocale];
+  const dict = DICTS[currentLocale] ?? {};
   let text = dict[key] ?? DICTS.en[key] ?? key;
   if (params) {
     for (const [name, value] of Object.entries(params)) {
-      text = text.replace(new RegExp(`\\{${name}\\}`, 'g'), String(value));
+      // 使用函数式替换：替换值中的 $&/$`/$'/$n 不会被当作特殊替换模式
+      const replacement = String(value);
+      text = text.replace(new RegExp(`\\{${name}\\}`, 'g'), () => replacement);
     }
   }
   return text;
@@ -46,8 +48,9 @@ export function t(key: TranslationKey, params?: TranslationParams): string {
 /** 业务 Error 上的 code → 本地化文案；无 code 时回退通用文案 */
 export function tError(e: unknown): string {
   const code = (e as { code?: string })?.code;
-  if (code && typeof code === 'string' && code in DICTS.en) {
-    return t(code as TranslationKey);
+  const key = code && typeof code === 'string' ? `error.${code}` : null;
+  if (key && key in DICTS.en) {
+    return t(key as TranslationKey);
   }
   return t('error.generic');
 }

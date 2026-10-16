@@ -1,5 +1,5 @@
 // Android 实现：Health Connect（react-native-health-connect）
-// 只读（READ_STEPS），权限仅由用户主动触发同步时请求
+// 只读（READ_STEPS），权限仅由用户主动触发连接时请求
 
 import {
   getSdkStatus,
@@ -9,8 +9,8 @@ import {
   aggregateRecord,
 } from 'react-native-health-connect';
 import {
+  dayRangeForDate,
   parseStepsAggregate,
-  todayDayRange,
   type PlatformSteps,
   type PlatformStepsAvailability,
 } from './platformSteps';
@@ -19,9 +19,20 @@ let initPromise: Promise<boolean> | null = null;
 
 function ensureInitialized(): Promise<boolean> {
   if (!initPromise) {
-    initPromise = initialize().catch(() => false);
+    // 失败时复位缓存：用户可能在 App 运行期间安装/更新 Health Connect，需要允许重试
+    initPromise = initialize()
+      .then(() => true)
+      .catch((e) => {
+        if (__DEV__) console.warn('[platformSteps] Health Connect initialize failed:', e);
+        initPromise = null;
+        return false;
+      });
   }
   return initPromise;
+}
+
+function warnError(scope: string, e: unknown): void {
+  if (__DEV__) console.warn(`[platformSteps] ${scope} failed:`, e);
 }
 
 function mapStatus(status: number): PlatformStepsAvailability {
@@ -36,7 +47,8 @@ export const platformSteps: PlatformSteps = {
   availability: async () => {
     try {
       return mapStatus(await getSdkStatus());
-    } catch {
+    } catch (e) {
+      warnError('getSdkStatus', e);
       return 'unavailable';
     }
   },
@@ -51,16 +63,17 @@ export const platformSteps: PlatformSteps = {
       return granted.some(
         (p) => p.accessType === 'read' && p.recordType === 'Steps'
       );
-    } catch {
+    } catch (e) {
+      warnError('requestPermission', e);
       return false;
     }
   },
 
-  readTodaySteps: async () => {
+  readStepsForDate: async (date: string) => {
     try {
       if ((await platformSteps.availability()) !== 'available') return null;
       if (!(await ensureInitialized())) return null;
-      const range = todayDayRange();
+      const range = dayRangeForDate(date);
       const result = await aggregateRecord({
         recordType: 'Steps',
         timeRangeFilter: {
@@ -70,7 +83,8 @@ export const platformSteps: PlatformSteps = {
         },
       });
       return parseStepsAggregate(result);
-    } catch {
+    } catch (e) {
+      warnError('aggregateRecord', e);
       return null;
     }
   },

@@ -8,7 +8,7 @@ import {
   Pressable,
   StyleSheet,
 } from 'react-native';
-import { colors, spacing } from '../theme';
+import { colors, radius, spacing, typeScale } from '../theme';
 
 interface ButtonProps {
   title: string;
@@ -35,6 +35,8 @@ export function Button({
     <Pressable
       onPress={onPress}
       disabled={disabled}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !!disabled }}
       style={({ pressed }) => [
         styles.button,
         {
@@ -119,31 +121,33 @@ const styles = StyleSheet.create({
   button: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
-    borderRadius: 8,
+    borderRadius: radius.sm,
+    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
   buttonText: {
-    fontSize: 15,
+    fontSize: typeScale.body,
     fontWeight: '600',
   },
   field: {
     marginBottom: spacing.md,
   },
   label: {
-    fontSize: 13,
+    fontSize: typeScale.caption,
     color: colors.muted,
     marginBottom: spacing.xs,
   },
   input: {
     borderWidth: 1,
     borderColor: colors.line,
-    borderRadius: 8,
+    borderRadius: radius.sm,
+    minHeight: 48,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    fontSize: 15,
+    fontSize: typeScale.body,
     color: colors.text,
-    backgroundColor: colors.card,
+    backgroundColor: colors.surfaceSoft,
   },
   inputDisabled: {
     opacity: 0.5,
@@ -167,6 +171,6 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     color: colors.muted,
-    fontSize: 14,
+    fontSize: typeScale.body - 1,
   },
 });

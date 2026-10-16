@@ -17,9 +17,9 @@ const GENDER_OPTIONS: {
   chipBg: string;
   iconColor: string;
 }[] = [
-  { value: 'male', label: 'gender.male', icon: 'man-outline', desc: 'onboarding.genderMaleDesc', chipBg: '#2563eb14', iconColor: '#2563eb' },
-  { value: 'female', label: 'gender.female', icon: 'woman-outline', desc: 'onboarding.genderFemaleDesc', chipBg: '#EC489914', iconColor: '#EC4899' },
-  { value: 'unknown', label: 'gender.unknown', icon: 'help-circle-outline', desc: 'onboarding.genderUnknownDesc', chipBg: '#6b728014', iconColor: '#6b7280' },
+  { value: 'male', label: 'gender.male', icon: 'man-outline', desc: 'onboarding.genderMaleDesc', chipBg: '#34785b18', iconColor: '#34785b' },
+  { value: 'female', label: 'gender.female', icon: 'woman-outline', desc: 'onboarding.genderFemaleDesc', chipBg: '#E8796418', iconColor: '#B9503D' },
+  { value: 'unknown', label: 'gender.unknown', icon: 'help-circle-outline', desc: 'onboarding.genderUnknownDesc', chipBg: '#68766d18', iconColor: '#68766d' },
 ];
 
 interface GenderOptionCardsProps {
@@ -76,7 +76,7 @@ const styles = StyleSheet.create({
   },
   cardActive: {
     borderColor: colors.accent,
-    backgroundColor: '#2563eb14',
+    backgroundColor: colors.accentSoft,
   },
   genderChip: {
     width: 44,

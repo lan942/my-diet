@@ -2,7 +2,7 @@
   "expo": {
     "name": "NutriPulse: Calorie & Macros",
     "slug": "my-diet",
-    "version": "1.8.2",
+    "version": "1.9.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "light",
@@ -10,13 +10,13 @@
     "splash": {
       "image": "./assets/images/icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#A8E6C9"
+      "backgroundColor": "#EAF3EC"
     },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.zhongchaojun.mydiet",
       "infoPlist": {
-        "NSHealthShareUsageDescription": "NutriPulse reads today's step count from Apple Health to estimate your daily activity energy. Data is used on-device only and is never uploaded or shared."
+        "NSHealthShareUsageDescription": "NutriPulse reads your daily step counts from Apple Health to estimate activity energy, including past days you review in the app. Data is used on-device only and is never uploaded or shared."
       },
       "privacyManifests": {
         "NSPrivacyTracking": false,
@@ -34,10 +34,10 @@
     },
     "android": {
       "package": "com.zhongchaojun.mydiet",
-      "versionCode": 27,
+      "versionCode": 30,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#A8E6C9"
+        "backgroundColor": "#EAF3EC"
       }
     },
     "web": {},

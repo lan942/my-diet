@@ -1,17 +1,18 @@
 // 水平刻度尺选择器：拖动选值，逐格触觉反馈，程序化滚动（单位切换）不误触发回调
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
   ScrollView,
   StyleSheet,
-  useWindowDimensions,
   type NativeSyntheticEvent,
   type NativeScrollEvent,
+  type LayoutChangeEvent,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { colors } from '../theme';
 
 const TICK_W = 12;
 
@@ -36,14 +37,20 @@ export default function RulerPicker({
   onChange,
   formatValue,
 }: RulerPickerProps) {
-  const { width: screenW } = useWindowDimensions();
+  // 实测滚动容器自身宽度（刻度尺全部处在带 padding/maxWidth 的父容器内，
+  // 用 useWindowDimensions 的屏宽会让两侧居中内边距系统性偏大、pin 与刻度错位）
+  const [viewW, setViewW] = useState(0);
+  const sidePad = viewW > 0 ? (viewW - TICK_W) / 2 : 0;
   const count = Math.round((max - min) / step) + 1;
   const scrollRef = useRef<ScrollView>(null);
   const lastXRef = useRef(0);
   const suppressRef = useRef(false);
   const suppressXRef = useRef(0);
   const selfChangeRef = useRef(false);
-  const lastValueRef = useRef(value);
+  // 外部值越界（如单位切换后换算值超出本量程）时仅在尺内钳制显示，
+  // 不主动 onChange 回写，避免污染父组件存储值
+  const clampedValue = Math.max(min, Math.min(max, value));
+  const lastValueRef = useRef(clampedValue);
 
   const xForValue = (v: number) => ((v - min) / step) * TICK_W;
   const valueAtX = (x: number) => {
@@ -54,18 +61,25 @@ export default function RulerPicker({
   // 外部值变化（初始化/单位切换）→ 程序化滚动，期间抑制 onChange；
   // 自己 onChange 引发的 value 更新则跳过，避免与用户手指对抗
   useEffect(() => {
+    // 容器宽度未测得前不做程序化滚动（此时内边距与可滚范围均不正确）
+    if (viewW === 0) return;
     if (selfChangeRef.current) {
       selfChangeRef.current = false;
       return;
     }
-    const x = xForValue(value);
+    const x = xForValue(clampedValue);
     if (Math.abs(x - lastXRef.current) > 0.5) {
       suppressRef.current = true;
       suppressXRef.current = x;
       scrollRef.current?.scrollTo({ x, animated: false });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value, min, max, step]);
+  }, [value, clampedValue, min, max, step, viewW]);
+
+  function handleLayout(e: LayoutChangeEvent) {
+    const w = e.nativeEvent.layout.width;
+    if (w > 0 && Math.abs(w - viewW) > 0.5) setViewW(w);
+  }
 
   function handleScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
     const x = e.nativeEvent.contentOffset.x;
@@ -92,14 +106,14 @@ export default function RulerPicker({
     );
   });
 
-  const display = formatValue ? formatValue(value) : `${value}`;
+  const display = formatValue ? formatValue(clampedValue) : `${clampedValue}`;
 
   return (
     <View style={styles.container}>
       <View style={styles.valueRow}>
         {icon ? (
           <View style={styles.iconChip}>
-            <Ionicons name={icon} size={15} color="#2563eb" />
+            <Ionicons name={icon} size={15} color={colors.accent} />
           </View>
         ) : null}
         <Text style={styles.valueText} maxFontSizeMultiplier={2}>
@@ -120,13 +134,14 @@ export default function RulerPicker({
           snapToInterval={TICK_W}
           decelerationRate="fast"
           onScroll={handleScroll}
+          onLayout={handleLayout}
           onScrollBeginDrag={() => {
             // 用户接管手势，解除程序化滚动的抑制
             suppressRef.current = false;
           }}
           scrollEventThrottle={16}
           contentContainerStyle={{
-            paddingHorizontal: (screenW - TICK_W) / 2,
+            paddingHorizontal: sidePad,
             alignItems: 'flex-end',
           }}
         >
@@ -154,7 +169,7 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: '#2563eb14',
+    backgroundColor: colors.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -180,7 +195,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: 2,
     marginLeft: -1,
-    backgroundColor: '#2563eb',
+    backgroundColor: colors.accent,
     borderRadius: 1,
   },
   tick: {

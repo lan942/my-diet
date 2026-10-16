@@ -82,6 +82,14 @@ export interface DailyNutrition {
   total_fat: number;
 }
 
+// 能量平衡（纯派生，不持久化）：步数消耗 → 调整后热量目标 / 净热量 / 剩余预算
+export interface EnergyBalance {
+  stepsKcal: number;
+  adjustedCalorie: number;
+  netKcal: number;
+  remaining: number;
+}
+
 // JSON 全量备份（version 当前为 1）
 export interface BackupData {
   version: number;

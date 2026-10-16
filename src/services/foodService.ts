@@ -53,10 +53,32 @@ export function parsePortions(json: string | null): FoodPortion[] | null {
   try {
     const arr = JSON.parse(json) as FoodPortion[];
     if (!Array.isArray(arr) || arr.length === 0) return null;
-    if (arr.some((p) => !p || typeof p.grams !== 'number' || p.grams <= 0)) return null;
+    if (
+      arr.some(
+        (p) =>
+          !p ||
+          typeof p.grams !== 'number' ||
+          !Number.isFinite(p.grams) || // NaN/Infinity 不得漏过（NaN <= 0 === false）
+          p.grams <= 0 ||
+          typeof p.zh !== 'string' ||
+          !p.zh ||
+          typeof p.en !== 'string' ||
+          !p.en
+      )
+    ) {
+      return null;
+    }
     return arr;
   } catch {
     return null;
+  }
+}
+
+// GI 取值域：null（不标注）或 0–100 的有限整数
+export function validateGi(gi: number | null | undefined): void {
+  if (gi === null || gi === undefined) return;
+  if (!Number.isFinite(gi) || gi < 0 || gi > 100 || !Number.isInteger(gi)) {
+    throw new FoodError(ERR.INVALID_GI);
   }
 }
 
@@ -97,8 +119,10 @@ export const SEED_CATEGORIES: { zh: string; en: string; order: number }[] = [
   { zh: '膳食纤维', en: 'Fiber', order: 5 },
 ];
 
-export async function ensureSeedCategories(): Promise<void> {
-  const db = await getDb();
+export async function ensureSeedCategories(
+  externalDb?: SeedDb
+): Promise<void> {
+  const db = externalDb ?? (await getDb());
   const existing = await db.getAllAsync<CatRow>('SELECT * FROM food_category');
   if (existing.length > 0) return;
   const locale = getLocale();
@@ -165,6 +189,7 @@ export async function createFoodItem(input: {
     input.carb_per_100g,
     input.fat_per_100g
   );
+  validateGi(input.gi);
   const db = await getDb();
   const time = nowString();
   const res = await db.runAsync(
@@ -223,6 +248,7 @@ export async function updateFoodItem(
     input.carb_per_100g,
     input.fat_per_100g
   );
+  validateGi(input.gi);
   const db = await getDb();
   await db.runAsync(
     `UPDATE food_item SET
@@ -244,17 +270,20 @@ export async function updateFoodItem(
 }
 
 export async function deleteFoodItem(id: number): Promise<void> {
-  const refCount = await countIntakeByFoodItem(id);
-  if (refCount > 0) {
-    throw new FoodError(ERR.FOOD_IN_USE);
-  }
   const db = await getDb();
-  await db.runAsync('DELETE FROM food_item WHERE id = ?', [id]);
+  // 引用检查与删除置于同一事务，避免检查后并发写入产生孤儿引用
+  await db.withTransactionAsync(async () => {
+    const refCount = await countIntakeByFoodItem(id);
+    if (refCount > 0) {
+      throw new FoodError(ERR.FOOD_IN_USE);
+    }
+    await db.runAsync('DELETE FROM food_item WHERE id = ?', [id]);
+  });
 }
 
-// GI <= 55 视为低 GI
+// GI 0–55 视为低 GI（入库已限 0–100，下界为防御性判断）
 export function isLowGI(gi: number | null): boolean {
-  return gi !== null && gi <= 55;
+  return gi !== null && gi >= 0 && gi <= 55;
 }
 
 // ============ 双语显示（纯函数，vitest 可测） ============
@@ -377,12 +406,15 @@ export interface SeedFood {
 
 export const SEED_FOODS: SeedFood[] = [
   // —— 高优质蛋白质（蛋白质）——
+  // Everyday staples use USDA FoodData Central SR Legacy values per 100g.
   { zh: '鸡胸肉', en: 'Chicken Breast', category_zh: '蛋白质', kcal: 165, protein: 31, carb: 0, fat: 3.6, portions: [{ zh: '1 掌心大小', en: '1 Palm', grams: 100 }, { zh: '1 块鸡胸', en: '1 Breast Fillet', grams: 150 }], notes_zh: '极致低脂高蛋白，减脂增肌首选', notes_en: 'Ultra-lean protein, top pick for cutting' },
   { zh: '野生三文鱼', en: 'Wild Salmon', category_zh: '蛋白质', kcal: 206, protein: 22, carb: 0, fat: 12, portions: [{ zh: '1 掌心大小', en: '1 Palm', grams: 100 }, { zh: '1 块鱼排', en: '1 Fillet', grams: 150 }], notes_zh: '富含 Ω-3（rTG），护心护脑', notes_en: 'rTG omega-3 for heart & brain' },
   { zh: '蛋白（鸡蛋清）', en: 'Egg Whites', category_zh: '蛋白质', kcal: 52, protein: 11, carb: 0.7, fat: 0.2, portions: [{ zh: '1 份蛋清', en: '1 Egg White', grams: 30 }], notes_zh: '纯净蛋白质，极低热量负担', notes_en: 'Pure protein, minimal calories' },
   { zh: '希腊酸奶（0% 脂肪）', en: 'Greek Yogurt (0% Fat)', category_zh: '蛋白质', kcal: 59, protein: 10, carb: 3.6, fat: 0.4, portions: [{ zh: '1 单杯装', en: '1 Container', grams: 150 }, { zh: '1 杯', en: '1 Cup', grams: 245 }], notes_zh: '益生菌 + 酪蛋白长效饱腹', notes_en: 'Probiotics + casein for satiety' },
   { zh: '老豆腐', en: 'Tofu (Firm)', category_zh: '蛋白质', kcal: 144, protein: 17, carb: 2.8, fat: 8.8, notes_zh: '植物蛋白，富含大豆异黄酮与钙', notes_en: 'Plant protein with isoflavones & calcium' },
   { zh: '鸡蛋', en: 'Egg', category_zh: '蛋白质', kcal: 155, protein: 13, carb: 1.1, fat: 11, portions: [{ zh: '1 个大号鸡蛋', en: '1 Large Egg', grams: 50 }], notes_zh: '全营养天然食物', notes_en: "Nature's multivitamin" },
+  { zh: '全脂牛奶（3.25%）', en: 'Whole Milk (3.25%)', category_zh: '蛋白质', kcal: 61, protein: 3.15, carb: 4.8, fat: 3.25, portions: [{ zh: '1 杯', en: '1 Cup', grams: 244 }], notes_zh: '全脂牛奶，按每 100g 计', notes_en: 'Whole cow milk, per 100g' },
+  { zh: '原味酸奶（全脂）', en: 'Plain Yogurt (Whole Milk)', category_zh: '蛋白质', kcal: 61, protein: 3.47, carb: 4.66, fat: 3.25, portions: [{ zh: '1 小杯', en: '1 Container', grams: 170 }, { zh: '1 杯', en: '1 Cup', grams: 245 }], notes_zh: '未加糖的全脂原味酸奶', notes_en: 'Plain whole-milk yogurt, unsweetened' },
   { zh: '虾', en: 'Shrimp', category_zh: '蛋白质', kcal: 99, protein: 24, carb: 0.2, fat: 0.3, notes_zh: '高蛋白低脂海鲜', notes_en: 'Lean seafood protein' },
 
   // —— 优质健康脂肪（脂肪）——
@@ -397,12 +429,17 @@ export const SEED_FOODS: SeedFood[] = [
   { zh: '燕麦片', en: 'Rolled Oats', category_zh: '碳水', kcal: 389, protein: 16.9, carb: 66.3, fat: 6.9, gi: 55, portions: [{ zh: '1/2 杯（干）', en: '1/2 Cup Dry', grams: 40 }, { zh: '1 杯（干）', en: '1 Cup Dry', grams: 80 }], notes_zh: 'β-葡聚糖平稳血糖', notes_en: 'Beta-glucan for steady glucose' },
   { zh: '藜麦', en: 'Quinoa', category_zh: '碳水', kcal: 120, protein: 4.4, carb: 21.3, fat: 1.9, gi: 53, portions: [{ zh: '1/2 碗（熟）', en: '1/2 Cup Cooked', grams: 90 }, { zh: '1 碗（熟）', en: '1 Cup Cooked', grams: 185 }], notes_zh: '全价蛋白，含 9 种必需氨基酸', notes_en: 'Complete amino-acid profile' },
   { zh: '糙米', en: 'Brown Rice', category_zh: '碳水', kcal: 348, protein: 7.7, carb: 77.9, fat: 2.7, gi: 56, notes_zh: '保留麸皮的全谷物', notes_en: 'Whole grain with bran intact' },
+  { zh: '白米饭', en: 'White Rice (Cooked)', category_zh: '碳水', kcal: 116, protein: 2.6, carb: 25.9, fat: 0.3, gi: 73, portions: [{ zh: '1/2 碗（熟）', en: '1/2 Bowl Cooked', grams: 75 }, { zh: '1 碗（熟）', en: '1 Bowl Cooked', grams: 150 }], notes_zh: '熟重口径，训练后快速补碳的常见主食', notes_en: 'Cooked weight; common staple for fast post-workout carbs' },
+  { zh: '土豆（水煮）', en: 'Potato (Boiled)', category_zh: '碳水', kcal: 87, protein: 1.87, carb: 20.13, fat: 0.1, portions: [{ zh: '1 个中等土豆', en: '1 Medium Potato', grams: 173 }], notes_zh: '水煮熟重，不含额外调味料', notes_en: 'Boiled weight, without added seasoning' },
   { zh: '全麦面包', en: 'Whole Wheat Bread', category_zh: '碳水', kcal: 246, protein: 8.5, carb: 48.4, fat: 3.6, gi: 49, portions: [{ zh: '1 片', en: '1 Slice', grams: 35 }], notes_zh: '低 GI 全麦主食', notes_en: 'Low GI whole-grain staple' },
   { zh: '意大利面（全麦）', en: 'Whole Wheat Pasta', category_zh: '碳水', kcal: 324, protein: 12.5, carb: 62.7, fat: 1.8, gi: 48, notes_zh: '低 GI 训练主食', notes_en: 'Low GI training fuel' },
 
   // —— 膳食纤维（膳食纤维）——
   { zh: '扁豆', en: 'Lentils', category_zh: '膳食纤维', kcal: 353, protein: 25, carb: 63, fat: 0.4, notes_zh: '高蛋白高纤维双料选手', notes_en: 'Protein + fiber powerhouse' },
+  { zh: '鹰嘴豆', en: 'Chickpeas (Cooked)', category_zh: '膳食纤维', kcal: 164, protein: 8.9, carb: 27.4, fat: 2.6, portions: [{ zh: '1/2 杯（熟）', en: '1/2 Cup Cooked', grams: 80 }, { zh: '1 杯（熟）', en: '1 Cup Cooked', grams: 160 }], notes_zh: '熟重口径，植物蛋白 + 7.6g 膳食纤维，低 GI 长效饱腹', notes_en: 'Cooked weight; plant protein + 7.6g fiber, low-GI satiety' },
   { zh: '覆盆子', en: 'Raspberries', category_zh: '膳食纤维', kcal: 52, protein: 1.2, carb: 11.9, fat: 0.7, notes_zh: '6.5g 纤维/100g，低糖高纤', notes_en: '6.5g fiber per 100g, low sugar' },
+  { zh: '香蕉（生）', en: 'Banana (Raw)', category_zh: '膳食纤维', kcal: 89, protein: 1.09, carb: 22.84, fat: 0.33, portions: [{ zh: '1 根中等香蕉', en: '1 Medium Banana', grams: 118 }], notes_zh: '生香蕉可食部分，每 100g', notes_en: 'Raw edible banana, per 100g' },
+  { zh: '苹果（带皮，生）', en: 'Apple (Raw, with Skin)', category_zh: '膳食纤维', kcal: 52, protein: 0.26, carb: 13.81, fat: 0.17, portions: [{ zh: '1 个小苹果', en: '1 Small Apple', grams: 149 }, { zh: '1 个中等苹果', en: '1 Medium Apple', grams: 182 }], notes_zh: '带皮生苹果可食部分，每 100g', notes_en: 'Raw apple with skin, edible portion per 100g' },
   { zh: '梨', en: 'Pear', category_zh: '膳食纤维', kcal: 57, protein: 0.4, carb: 15.2, fat: 0.1, notes_zh: '果胶丰富，高水分饱腹', notes_en: 'Pectin fiber, hydrating' },
   { zh: '90% 黑巧', en: 'Dark Chocolate (90%)', category_zh: '膳食纤维', kcal: 598, protein: 7.8, carb: 42.6, fat: 45.9, portions: [{ zh: '1 小块', en: '1 Square', grams: 10 }, { zh: '2 小块', en: '2 Squares', grams: 20 }], notes_zh: '黄烷醇护心血管，抗炎首选', notes_en: 'Flavanols for heart & inflammation' },
 
@@ -413,50 +450,103 @@ export const SEED_FOODS: SeedFood[] = [
   { zh: '番茄', en: 'Tomato', category_zh: '抗氧化蔬菜', kcal: 18, protein: 0.9, carb: 3.9, fat: 0.2, notes_zh: '番茄红素，护心抗氧化', notes_en: 'Lycopene for heart health' },
 ];
 
-export async function ensureSeedFoods(): Promise<void> {
-  const db = await getDb();
+type SeedDb = Awaited<ReturnType<typeof getDb>>;
+
+// 分类定位：种子分类的 zh/en 名都可能已入库（取决于首启 locale），任一命中即可
+async function resolveSeedCatIds(): Promise<{
+  byZh: Map<string, number | undefined>;
+  byEn: Map<string, number | undefined>;
+}> {
+  const cats = await listCategories();
+  const catMap = new Map(cats.map((c) => [c.name, c.id]));
+  return {
+    byZh: new Map(SEED_CATEGORIES.map((c) => [c.zh, catMap.get(c.zh)])),
+    byEn: new Map(SEED_CATEGORIES.map((c) => [c.en, catMap.get(c.en)])),
+  };
+}
+
+// 插入单条种子食物（新装批量写入与升级补齐共用）。双语双写：name 固定中文
+// canonical，name_en 存英文，显示层按 locale 选取
+async function insertSeedFood(db: SeedDb, seed: SeedFood, catId: number): Promise<void> {
+  await db.runAsync(
+    `INSERT INTO food_item
+     (name, name_en, category_id, kcal_per_100g, protein_per_100g, carb_per_100g, fat_per_100g, gi, notes, notes_en, portions, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      seed.zh,
+      seed.en,
+      catId,
+      seed.kcal,
+      seed.protein,
+      seed.carb,
+      seed.fat,
+      seed.gi ?? null,
+      seed.notes_zh ?? '',
+      seed.notes_en ?? null,
+      seed.portions ? JSON.stringify(seed.portions) : null,
+      nowString(),
+    ]
+  );
+}
+
+// portions 的 UPDATE 回填是 v1.7→v1.8 的一次性迁移，只服务当时已随官方版本
+// 下发的 16 个含预设种子 canonical 名（旧库官方行 portions 为 NULL）。此集合
+// 冻结不扩展：之后新增的种子（如 v1.8.3 白米饭/鹰嘴豆）只走「缺失即整行插入」，
+// 库中若已存在其同名行则必为用户自建，UPDATE 绝不能把官方 portions 注入用户行
+export const PORTION_BACKFILL_V180: ReadonlySet<string> = new Set([
+  '鸡胸肉',
+  '野生三文鱼',
+  '蛋白（鸡蛋清）',
+  '希腊酸奶（0% 脂肪）',
+  '鸡蛋',
+  '牛油果',
+  '特级初榨橄榄油',
+  '大杏仁',
+  '红薯',
+  '燕麦片',
+  '藜麦',
+  '全麦面包',
+  '90% 黑巧',
+  '蓝莓',
+  '西兰花',
+  '菠菜',
+]);
+
+export async function ensureSeedFoods(externalDb?: SeedDb): Promise<void> {
+  const db = externalDb ?? (await getDb());
   const existing = await db.getAllAsync<ItemRow>('SELECT * FROM food_item');
+  const { byZh: idByZh, byEn: idByEn } = await resolveSeedCatIds();
+
   if (existing.length > 0) {
-    // 升级回填：旧版本种子食物无 portions（种子仅在库空时写入）。
-    // 按中文 canonical 名匹配（种子 name 固定中文双写），只填 NULL 不覆盖
+    const existingNames = new Set(existing.map((r) => r.name));
+
+    // 升级回填 1（v1.7→v1.8 一次性迁移）：仅对冻结集合内的历史官方种子名、且
+    // 库中已存在的行按 canonical 名填 NULL；缺失种子（下面整行插入）与新版本
+    // 种子的同名用户自建行均不命中，保持原样
     for (const seed of SEED_FOODS) {
       if (!seed.portions) continue;
+      if (!existingNames.has(seed.zh)) continue;
+      if (!PORTION_BACKFILL_V180.has(seed.zh)) continue;
       await db.runAsync(
         'UPDATE food_item SET portions = ? WHERE name = ? AND portions IS NULL',
         [JSON.stringify(seed.portions), seed.zh]
       );
     }
+
+    // 升级回填 2：新版本新增的种子食物对老用户缺失，按 canonical 中文名
+    // 检测后幂等插入；已存在同名条目（官方旧行或用户自建）一律跳过不覆盖
+    for (const seed of SEED_FOODS) {
+      if (existingNames.has(seed.zh)) continue;
+      const catId = idByZh.get(seed.category_zh) ?? idByEn.get(seed.category_zh);
+      if (catId === undefined) continue;
+      await insertSeedFood(db, seed, catId);
+    }
     return;
   }
-
-  const cats = await listCategories();
-  // 分类定位：种子分类的 zh/en 名都可能已入库（取决于首启 locale），任一命中即可
-  const catMap = new Map(cats.map((c) => [c.name, c.id]));
-  const idByZh = new Map(SEED_CATEGORIES.map((c) => [c.zh, catMap.get(c.zh)]));
-  const idByEn = new Map(SEED_CATEGORIES.map((c) => [c.en, catMap.get(c.en)]));
 
   for (const seed of SEED_FOODS) {
     const catId = idByZh.get(seed.category_zh) ?? idByEn.get(seed.category_zh);
     if (catId === undefined) continue;
-    // 双语双写：name 固定中文 canonical，name_en 存英文，显示层按 locale 选取
-    await db.runAsync(
-      `INSERT INTO food_item
-       (name, name_en, category_id, kcal_per_100g, protein_per_100g, carb_per_100g, fat_per_100g, gi, notes, notes_en, portions, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        seed.zh,
-        seed.en,
-        catId,
-        seed.kcal,
-        seed.protein,
-        seed.carb,
-        seed.fat,
-        seed.gi ?? null,
-        seed.notes_zh ?? '',
-        seed.notes_en ?? null,
-        seed.portions ? JSON.stringify(seed.portions) : null,
-        nowString(),
-      ]
-    );
+    await insertSeedFood(db, seed, catId);
   }
 }

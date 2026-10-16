@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
-import { cardShadow, colors, macroColors, spacing } from '../theme';
+import { cardShadow, colors, macroColors, radius, spacing, typeScale } from '../theme';
 import { useApp } from '../state/AppContext';
 import { t, tError, type TranslationKey } from '../i18n';
 import {
@@ -161,6 +161,11 @@ export default function FoodLibraryScreen() {
       setFormError(t('error.ERR_NUTRITION_NOT_FINITE'));
       return;
     }
+    // GI：留空或 0–100 的整数（服务层 validateGi 同步兜底）
+    if (g !== null && (!Number.isFinite(g) || g < 0 || g > 100 || !Number.isInteger(g))) {
+      setFormError(t('error.ERR_INVALID_GI'));
+      return;
+    }
     setSaving(true);
     try {
       if (formMode === 'edit' && editing) {
@@ -210,13 +215,19 @@ export default function FoodLibraryScreen() {
 
   async function handleQuickAdd(grams: number, meal: string) {
     if (!quickFood) return;
+    // 插入失败才抛错（抽屉保留、允许重试）；一旦插入成功，
+    // 即使后续 refresh 失败也不再抛出——否则用户重试会产生重复记录
     await createIntake({
       date: todayString(),
       food_item_id: quickFood.id,
       grams,
       meal,
     });
-    await refresh();
+    try {
+      await refresh();
+    } catch {
+      // 记录已入库，列表将在下次加载时刷新
+    }
     showToast(t('food.addedToast'));
   }
 
@@ -231,12 +242,18 @@ export default function FoodLibraryScreen() {
             value={query}
             onChangeText={setQuery}
             placeholder={t('food.searchPh')}
+            accessibilityLabel={t('food.searchPh')}
             placeholderTextColor={colors.muted}
             returnKeyType="search"
             maxFontSizeMultiplier={1.4}
           />
           {query.length > 0 && (
-            <Pressable onPress={() => setQuery('')} hitSlop={8}>
+            <Pressable
+              onPress={() => setQuery('')}
+              accessibilityRole="button"
+              accessibilityLabel={t('food.clearSearch')}
+              style={styles.clearSearch}
+            >
               <Ionicons name="close-circle" size={16} color={colors.muted} />
             </Pressable>
           )}
@@ -250,6 +267,9 @@ export default function FoodLibraryScreen() {
         >
           <Pressable
             style={[styles.catChip, selectedCat === null && styles.catChipActive]}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.all')}
+            accessibilityState={{ selected: selectedCat === null }}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
               setSelectedCat(null);
@@ -266,6 +286,9 @@ export default function FoodLibraryScreen() {
             <Pressable
               key={c.id}
               style={[styles.catChip, selectedCat === c.id && styles.catChipActive]}
+              accessibilityRole="button"
+              accessibilityLabel={categoryDisplayKey(c.name) ? t(categoryDisplayKey(c.name)!) : c.name}
+              accessibilityState={{ selected: selectedCat === c.id }}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                 setSelectedCat(c.id);
@@ -306,7 +329,7 @@ export default function FoodLibraryScreen() {
                   <View style={[styles.cardBar, { backgroundColor: barColor }]} />
                   <View style={styles.cardBody}>
                     <View style={styles.nameRow}>
-                      <Text style={styles.foodName} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+                      <Text style={styles.foodName} maxFontSizeMultiplier={1.4}>
                         {foodDisplayName(item)}
                       </Text>
                       {item.gi !== null && isLowGI(item.gi) && (
@@ -344,7 +367,7 @@ export default function FoodLibraryScreen() {
                       </View>
                     )}
                     {item.notes ? (
-                      <Text style={styles.cardNotes} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+                      <Text style={styles.cardNotes} maxFontSizeMultiplier={1.4}>
                         {foodDisplayNotes(item)}
                       </Text>
                     ) : null}
@@ -352,7 +375,8 @@ export default function FoodLibraryScreen() {
                   <View style={styles.actionCol}>
                     <Pressable
                       style={styles.quickAddBtn}
-                      hitSlop={6}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${t('food.addToToday')}: ${foodDisplayName(item)}`}
                       onPress={() => {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                         setQuickFood(item);
@@ -361,10 +385,20 @@ export default function FoodLibraryScreen() {
                       <Ionicons name="add" size={20} color="#ffffff" />
                     </Pressable>
                     <View style={styles.minorActions}>
-                      <Pressable onPress={() => startEdit(item)} hitSlop={8}>
+                      <Pressable
+                        onPress={() => startEdit(item)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${t('food.editTitle')}: ${foodDisplayName(item)}`}
+                        style={styles.minorActionButton}
+                      >
                         <Ionicons name="create-outline" size={17} color={colors.muted} />
                       </Pressable>
-                      <Pressable onPress={() => setDeleteTarget(item)} hitSlop={8}>
+                      <Pressable
+                        onPress={() => setDeleteTarget(item)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${t('common.delete')}: ${foodDisplayName(item)}`}
+                        style={styles.minorActionButton}
+                      >
                         <Ionicons name="trash-outline" size={17} color={colors.muted} />
                       </Pressable>
                     </View>
@@ -375,7 +409,7 @@ export default function FoodLibraryScreen() {
           )}
 
           {/* 底部固定轻量级入口：自定义食物 */}
-          <Pressable style={styles.createBtn} onPress={startAdd}>
+          <Pressable style={styles.createBtn} onPress={startAdd} accessibilityRole="button">
             <Ionicons name="add-circle-outline" size={20} color={colors.accent} />
             <Text style={styles.createBtnText} maxFontSizeMultiplier={1.4}>
               {t('food.createCustom')}
@@ -506,17 +540,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     backgroundColor: colors.card,
-    borderRadius: 14,
+    borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 2,
+    minHeight: 48,
     ...cardShadow,
     marginBottom: spacing.sm,
   },
   searchInput: {
     flex: 1,
-    fontSize: 15,
+    fontSize: typeScale.body,
     color: colors.text,
     paddingVertical: 0,
+  },
+  clearSearch: {
+    width: 40,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   catRow: {
     paddingVertical: spacing.sm,
@@ -525,7 +566,9 @@ const styles = StyleSheet.create({
   catChip: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
-    borderRadius: 16,
+    minHeight: 44,
+    justifyContent: 'center',
+    borderRadius: radius.pill,
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.line,
@@ -547,7 +590,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   sectionTitle: {
-    fontSize: 15,
+    fontSize: typeScale.body,
     fontWeight: '700',
     color: colors.text,
   },
@@ -569,7 +612,7 @@ const styles = StyleSheet.create({
   foodCard: {
     flexDirection: 'row',
     backgroundColor: colors.card,
-    borderRadius: 16,
+    borderRadius: radius.md,
     marginBottom: spacing.md,
     overflow: 'hidden',
   },
@@ -586,7 +629,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   foodName: {
-    flexShrink: 1,
+    flex: 1,
     fontSize: 15,
     fontWeight: '700',
     color: colors.text,
@@ -629,16 +672,22 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   quickAddBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 44,
+    minHeight: 44,
+    borderRadius: 22,
     backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
   minorActions: {
     flexDirection: 'row',
-    gap: spacing.md,
+    gap: spacing.xs,
+  },
+  minorActionButton: {
+    width: 40,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   createBtn: {
     flexDirection: 'row',
@@ -647,7 +696,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     borderWidth: 1,
     borderColor: colors.accent,
-    borderRadius: 14,
+    borderRadius: radius.md,
     borderStyle: 'dashed',
     paddingVertical: spacing.md,
     marginTop: spacing.sm,

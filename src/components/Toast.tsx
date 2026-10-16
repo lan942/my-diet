@@ -4,7 +4,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Text, StyleSheet } from 'react-native';
 
-import { spacing } from '../theme';
+import { colors, radius, spacing } from '../theme';
 
 export function useToast(): {
   toast: string;
@@ -67,10 +67,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 96,
     alignSelf: 'center',
-    backgroundColor: 'rgba(17,24,39,0.9)',
+    backgroundColor: colors.text,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
-    borderRadius: 20,
+    borderRadius: radius.pill,
   },
   toastText: {
     color: '#ffffff',

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { View, StyleSheet, ViewProps } from 'react-native';
-import { colors, spacing } from '../theme';
+import { cardShadow, colors, radius, spacing } from '../theme';
 
 interface CardProps extends ViewProps {
   children: React.ReactNode;
@@ -19,10 +19,11 @@ export default function Card({ children, style, ...rest }: CardProps) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.card,
-    borderRadius: 12,
+    borderRadius: radius.md,
     padding: spacing.lg,
     borderWidth: 1,
     borderColor: colors.line,
     marginBottom: spacing.md,
+    ...cardShadow,
   },
 });

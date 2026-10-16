@@ -7,11 +7,12 @@ export const zh: Record<TranslationKey, string> = {
   'tab.profile': '我的',
   'tab.food': '食物库',
   'tab.today': '今日',
-  'tab.steps': '步数',
 
   // Common
   'common.loading': '加载中…',
   'common.error': '错误',
+  'common.retry': '重试',
+  'common.bootError': '应用启动时出现问题，请点击重试。',
   'common.save': '保存',
   'common.cancel': '取消',
   'common.delete': '删除',
@@ -22,6 +23,8 @@ export const zh: Record<TranslationKey, string> = {
   'common.today': '今天',
   'common.yesterday': '昨天',
   'common.dayBeforeYesterday': '前天',
+  'date.previous': '前一天',
+  'date.next': '后一天',
 
   // Macros & gender & units
   'macro.calorie': '热量',
@@ -172,8 +175,11 @@ export const zh: Record<TranslationKey, string> = {
   'food.errNutrition': '营养值必须为数字',
   'food.deleteTitle': '删除确认',
   'food.deleteMsg': '确定删除「{name}」吗？',
+  'intake.deleteTitle': '删除摄入记录',
+  'intake.deleteMsg': '确定删除这条摄入记录吗？删除后不可恢复。',
   'food.cannotDelete': '无法删除',
   'food.searchPh': '搜索食物…',
+  'food.clearSearch': '清除搜索',
   'food.allFoodsTitle': '全部食物',
   'food.per100g': '每 100g',
   'food.createCustom': '自定义食物',
@@ -195,25 +201,25 @@ export const zh: Record<TranslationKey, string> = {
   'food.addedToast': '已加入今日 ✓',
   'food.quickLogFailed': '记录失败',
 
-  // Steps
-  'steps.today': '今日步数',
+  // Steps（今日页设备自动同步）
+  'steps.cardTitle': '步数',
   'steps.unit': '步',
   'steps.kcalHint': '≈ 消耗 {kcal} kcal',
-  'steps.inputTitle': '录入步数',
-  'steps.label': '步数',
-  'steps.labelPh': '例如 8000',
-  'steps.saveOverwrite': '保存（覆盖当天）',
-  'steps.history': '历史记录',
-  'steps.empty': '暂无步数记录',
+  'steps.connect': '连接健康应用',
+  'steps.syncing': '同步中…',
+  'steps.notConnected': '尚未连接',
+
+  // 能量平衡
+  'energy.net': '净热量',
+  'energy.remaining': '剩余',
+  'energy.adjustedHint': '目标已计入步数消耗',
 
   // Step sync
   'sync.button': '从健康服务同步',
-  'sync.rationale': '读取设备健康服务中的今日步数以估算活动消耗，数据仅保存在本机。',
+  'sync.rationale': '读取设备健康服务中当日的步数以估算活动消耗，数据仅保存在本机。',
   'sync.success': '已同步 {steps} 步',
-  'sync.denied': '未获授权，仍可手动录入步数',
+  'sync.denied': '未获授权，可重新点击连接并允许读取步数',
   'sync.unavailable': '当前设备不支持健康服务',
-  'sync.done': '已通过健康服务同步',
-  'sync.protected': '当天已有手动录入，保持手动值不覆盖',
 
   // Onboarding
   'onboarding.stepOf': '第 {step} 步 · 共 4 步',
@@ -266,6 +272,7 @@ export const zh: Record<TranslationKey, string> = {
   'error.ERR_NUTRITION_NOT_FINITE': '营养值必须为有限数',
   'error.ERR_NUTRITION_NEGATIVE': '营养值必须为非负数',
   'error.ERR_EMPTY_FOOD_NAME': '食物名称不能为空',
+  'error.ERR_INVALID_GI': 'GI 值必须是 0–100 的整数',
   'error.ERR_FOOD_IN_USE': '该食物已被摄入记录引用，无法删除',
   'error.ERR_INVALID_BACKUP': '备份文件格式不合法',
   'error.ERR_BACKUP_VERSION': '备份版本不兼容，请升级应用',

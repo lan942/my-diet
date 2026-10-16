@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { cardShadow, colors, radius } from '../theme';
 
 export interface SegmentOption<T extends string> {
   label: string;
@@ -28,10 +29,13 @@ export default function SegmentedControl<T extends string>({
             key={o.value}
             style={[styles.segment, active && styles.segmentActive]}
             onPress={() => onChange(o.value)}
+            accessibilityRole="radio"
+            accessibilityState={{ checked: active }}
           >
             <Text
               style={[styles.text, active && styles.textActive]}
               maxFontSizeMultiplier={1.4}
+              numberOfLines={1}
             >
               {o.label}
             </Text>
@@ -45,30 +49,28 @@ export default function SegmentedControl<T extends string>({
 const styles = StyleSheet.create({
   wrap: {
     flexDirection: 'row',
-    backgroundColor: '#e9edf2',
-    borderRadius: 10,
+    backgroundColor: colors.line,
+    borderRadius: radius.sm,
     padding: 3,
   },
   segment: {
     flex: 1,
     paddingVertical: 7,
-    borderRadius: 8,
+    borderRadius: radius.sm,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
   },
   segmentActive: {
-    backgroundColor: '#ffffff',
-    shadowColor: '#000000',
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 2,
+    backgroundColor: colors.card,
+    ...cardShadow,
   },
   text: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#6b7280',
+    color: colors.muted,
   },
   textActive: {
-    color: '#111827',
+    color: colors.text,
   },
 });

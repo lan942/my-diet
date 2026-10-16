@@ -28,6 +28,11 @@ interface BodyMetricsRulersProps {
   onUnit: (u: UnitSystem) => void;
 }
 
+// 公制边界值换算到美制后可能落在美制量程外（100cm→39.5in、200kg→441lb），
+// 入尺前钳制到 [min,max]，保证 pin 与读数一致（RulerPicker 内部另有同样的显示钳制）
+const clampRange = (v: number, min: number, max: number) =>
+  Math.max(min, Math.min(max, v));
+
 export default function BodyMetricsRulers({
   age,
   heightCm,
@@ -62,7 +67,11 @@ export default function BodyMetricsRulers({
           min={unit === 'metric' ? 100 : 40}
           max={unit === 'metric' ? 250 : 98}
           step={unit === 'metric' ? 1 : 0.5}
-          value={unit === 'metric' ? heightCm : cmToInSnap(heightCm)}
+          value={
+            unit === 'metric'
+              ? heightCm
+              : clampRange(cmToInSnap(heightCm), 40, 98)
+          }
           unit={unit === 'metric' ? t('unit.cm') : t('unit.in')}
           icon="body-outline"
           onChange={(v) => onHeightCm(unit === 'metric' ? v : inToCm(v))}
@@ -76,7 +85,11 @@ export default function BodyMetricsRulers({
           min={unit === 'metric' ? 30 : 66}
           max={unit === 'metric' ? 200 : 440}
           step={unit === 'metric' ? 0.5 : 1}
-          value={unit === 'metric' ? weightKg : Math.round(kgToLb(weightKg))}
+          value={
+            unit === 'metric'
+              ? weightKg
+              : clampRange(Math.round(kgToLb(weightKg)), 66, 440)
+          }
           unit={unit === 'metric' ? t('unit.kg') : t('unit.lb')}
           icon="speedometer-outline"
           onChange={(v) => onWeightKg(unit === 'metric' ? v : lbToKg(v))}

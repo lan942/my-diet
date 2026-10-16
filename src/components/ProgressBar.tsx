@@ -57,6 +57,7 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     marginBottom: spacing.xs,
   },
@@ -64,10 +65,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.text,
     fontWeight: '500',
+    flexShrink: 1,
   },
   value: {
     fontSize: 12,
     color: colors.muted,
+    flexShrink: 1,
+    textAlign: 'right',
   },
   track: {
     height: 8,

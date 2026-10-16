@@ -5,7 +5,12 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 
-import { clearIntakeLogs, restoreAllData, resetAllData } from '../db/database';
+import {
+  clearIntakeLogs,
+  restoreAllData,
+  resetAllData,
+  withReaderTransaction,
+} from '../db/database';
 import { DEFAULT_CONFIG, loadConfig, normalizeConfig, validateConfig } from './configStore';
 import {
   ensureSeedCategories,
@@ -39,6 +44,20 @@ const MEAL_KEYS: Record<string, TranslationKey> = {
   dinner: 'meal.dinner',
   snack: 'meal.snack',
 };
+
+const MEAL_VALUES = ['breakfast', 'lunch', 'dinner', 'snack'] as const;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// 真实日历日校验（拒绝 2026-02-30 这类格式合法但不存在的日期）
+function isValidDate(s: string): boolean {
+  if (!DATE_RE.test(s)) return false;
+  const [y, m, d] = s.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d;
+}
+
+const isPosInt = (n: number): boolean => Number.isInteger(n) && n > 0;
+const isNonNegInt = (n: number): boolean => Number.isInteger(n) && n >= 0;
 
 // ============ 纯逻辑（可测） ============
 
@@ -113,13 +132,87 @@ function parsePortionsBackup(v: unknown): FoodPortion[] | null {
   if (v === null || v === undefined) return null;
   if (Array.isArray(v)) {
     const arr = v as FoodPortion[];
-    if (arr.length === 0 || arr.some((p) => !p || typeof p.grams !== 'number' || p.grams <= 0)) {
+    if (
+      arr.length === 0 ||
+      arr.some(
+        (p) =>
+          !p ||
+          typeof p.grams !== 'number' ||
+          !Number.isFinite(p.grams) ||
+          p.grams <= 0 ||
+          typeof p.zh !== 'string' ||
+          !p.zh ||
+          typeof p.en !== 'string' ||
+          !p.en
+      )
+    ) {
       return null;
     }
     return arr;
   }
   if (typeof v === 'string') return parsePortions(v);
   return null;
+}
+
+/**
+ * 备份领域语义校验（结构校验之外的第二道闸门）：
+ * id 正整数且表内唯一；date 真实日历日；meal 枚举白名单；
+ * 克数/步数/营养值非负（grams 严格为正）；GI 为 0–100 整数；
+ * food_item.category_id 与 intake_log.food_item_id 引用必须在备份内闭包。
+ * 任一不满足 → INVALID_BACKUP，整单拒绝，不触碰数据库。
+ */
+export function validateBackupData(data: BackupData): void {
+  const reject = (): never => {
+    throw new DataError(ERR.INVALID_BACKUP);
+  };
+
+  const catIds = new Set<number>();
+  for (const c of data.food_categories) {
+    if (!isPosInt(c.id) || !c.name.trim() || !isNonNegInt(c.sort_order)) reject();
+    if (catIds.has(c.id)) reject();
+    catIds.add(c.id);
+  }
+
+  const itemIds = new Set<number>();
+  for (const f of data.food_items) {
+    if (!isPosInt(f.id) || !f.name.trim()) reject();
+    if (itemIds.has(f.id)) reject();
+    if (!catIds.has(f.category_id)) reject();
+    for (const v of [
+      f.kcal_per_100g,
+      f.protein_per_100g,
+      f.carb_per_100g,
+      f.fat_per_100g,
+    ]) {
+      if (v < 0) reject(); // finite 已由结构校验保证
+    }
+    if (f.gi !== null && (!Number.isInteger(f.gi) || f.gi < 0 || f.gi > 100)) reject();
+    if (f.portions) {
+      for (const p of f.portions) {
+        if (!Number.isFinite(p.grams) || p.grams <= 0 || !p.zh || !p.en) reject();
+      }
+    }
+    itemIds.add(f.id);
+  }
+
+  const intakeIds = new Set<number>();
+  for (const i of data.intake_logs) {
+    if (!isPosInt(i.id) || intakeIds.has(i.id)) reject();
+    if (!isValidDate(i.date) || !MEAL_VALUES.includes(i.meal as (typeof MEAL_VALUES)[number])) {
+      reject();
+    }
+    if (!(Number.isFinite(i.grams) && i.grams > 0)) reject();
+    if (!itemIds.has(i.food_item_id)) reject();
+    intakeIds.add(i.id);
+  }
+
+  const stepIds = new Set<number>();
+  for (const s of data.step_logs) {
+    if (!isPosInt(s.id) || stepIds.has(s.id)) reject();
+    if (!isValidDate(s.date) || !isNonNegInt(s.steps)) reject();
+    if (s.source !== 'manual' && s.source !== 'platform') reject();
+    stepIds.add(s.id);
+  }
 }
 
 /** 解析并结构校验备份 JSON；版本不兼容与字段缺失分别报错，失败不触碰数据库 */
@@ -135,7 +228,7 @@ export function parseBackup(json: string): BackupData {
   if (typeof version !== 'number') throw new DataError(ERR.INVALID_BACKUP);
   if (version !== BACKUP_VERSION) throw new DataError(ERR.BACKUP_VERSION);
 
-  return {
+  const data: BackupData = {
     version,
     exportedAt: optString(root, 'exportedAt') ?? '',
     config: asRow(root.config) as unknown as AppConfig,
@@ -175,6 +268,10 @@ export function parseBackup(json: string): BackupData {
       updated_at: optString(r, 'updated_at'),
     })),
   };
+
+  // 结构合法后再做领域语义/引用闭包校验
+  validateBackupData(data);
+  return data;
 }
 
 function csvEscape(value: string): string {
@@ -233,15 +330,29 @@ async function writeAndShare(content: string, filename: string, mimeType: string
   await Sharing.shareAsync(uri, { mimeType });
 }
 
+/** 单事务快照读取全库数据（导出前调用，保证五张表的一致性视图） */
+export async function readBackupSnapshot(): Promise<{
+  config: AppConfig;
+  intakeLogs: IntakeLog[];
+  stepLogs: StepLog[];
+  categories: FoodCategory[];
+  items: FoodItem[];
+}> {
+  return withReaderTransaction(async () => {
+    const [config, intakeLogs, stepLogs, categories, items] = await Promise.all([
+      loadConfig(),
+      listAllIntake(),
+      listSteps(),
+      listCategories(),
+      listFoodItems(),
+    ]);
+    return { config, intakeLogs, stepLogs, categories, items };
+  });
+}
+
 /** 收集全库数据 → JSON 备份 → 系统分享面板 */
 export async function exportBackupFile(): Promise<void> {
-  const [config, intakeLogs, stepLogs, categories, items] = await Promise.all([
-    loadConfig(),
-    listAllIntake(),
-    listSteps(),
-    listCategories(),
-    listFoodItems(),
-  ]);
+  const { config, intakeLogs, stepLogs, categories, items } = await readBackupSnapshot();
   await writeAndShare(
     buildBackup(config, intakeLogs, stepLogs, categories, items),
     `nutripulse-backup-${timestampName('json')}`,
@@ -251,7 +362,9 @@ export async function exportBackupFile(): Promise<void> {
 
 /** 全部摄入记录 → CSV → 系统分享面板 */
 export async function exportIntakeCsvFile(): Promise<void> {
-  const [intakeLogs, items] = await Promise.all([listAllIntake(), listFoodItems()]);
+  const [intakeLogs, items] = await withReaderTransaction(async () =>
+    Promise.all([listAllIntake(), listFoodItems()])
+  );
   await writeAndShare(
     buildIntakeCsv(intakeLogs, items),
     `nutripulse-intake-${timestampName('csv')}`,
@@ -276,20 +389,25 @@ export async function pickAndParseBackup(): Promise<BackupData | null> {
 export async function restoreFromBackup(): Promise<BackupData | null> {
   const data = await pickAndParseBackup();
   if (!data) return null;
+  let normalized: AppConfig;
   try {
-    validateConfig(normalizeConfig(data.config));
+    normalized = normalizeConfig(data.config);
+    validateConfig(normalized);
   } catch {
     throw new DataError(ERR.BACKUP_CONFIG);
   }
+  // 落库的必须是被校验过的归一化对象，而非原始 JSON
+  data.config = normalized;
   await restoreAllData(data);
   return data;
 }
 
-/** 清空重置：全部表清空 + 配置默认（onboarded=false）+ 重新播种 */
+/** 清空重置：清空 + 默认配置（onboarded=false）+ 播种在同一事务内原子完成 */
 export async function resetEverything(): Promise<void> {
-  await resetAllData(JSON.stringify(DEFAULT_CONFIG));
-  await ensureSeedCategories();
-  await ensureSeedFoods();
+  await resetAllData(JSON.stringify(DEFAULT_CONFIG), async (db) => {
+    await ensureSeedCategories(db);
+    await ensureSeedFoods(db);
+  });
 }
 
 /** 仅清空摄入记录：保留配置、步数与食物库，不触发首启引导 */

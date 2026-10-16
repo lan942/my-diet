@@ -8,12 +8,18 @@ let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
 export function getDb(): Promise<SQLite.SQLiteDatabase> {
   if (!dbPromise) {
-    dbPromise = SQLite.openDatabaseAsync('mydiet.db').then(async (db) => {
-      await db.execAsync('PRAGMA journal_mode = WAL;');
-      await db.execAsync(SCHEMA_SQL);
-      await ensureMigrations(db);
-      return db;
-    });
+    // 打开/建表失败时复位缓存，允许上层重试，避免本进程永久 reject
+    dbPromise = SQLite.openDatabaseAsync('mydiet.db')
+      .then(async (db) => {
+        await db.execAsync('PRAGMA journal_mode = WAL;');
+        await db.execAsync(SCHEMA_SQL);
+        await ensureMigrations(db);
+        return db;
+      })
+      .catch((e) => {
+        dbPromise = null;
+        throw e;
+      });
   }
   return dbPromise;
 }
@@ -44,6 +50,19 @@ async function ensureMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
   }
 }
 
+// 在单一只读语义事务中执行一批读取，保证多表导出的一致性快照
+// （expo-sqlite 单连接；事务内其他写入无法穿插）
+export async function withReaderTransaction<T>(
+  fn: (db: SQLite.SQLiteDatabase) => Promise<T>
+): Promise<T> {
+  const db = await getDb();
+  let result!: T;
+  await db.withTransactionAsync(async () => {
+    result = await fn(db);
+  });
+  return result;
+}
+
 // 本地时间字符串 YYYY-MM-DD HH:mm:ss
 export function nowString(): string {
   const d = new Date();
@@ -66,17 +85,22 @@ export async function clearIntakeLogs(): Promise<void> {
   });
 }
 
-// 清空全部业务表并写入指定配置（单事务，失败回滚；configJson 由调用方序列化，避免循环依赖）
-export async function resetAllData(configJson: string): Promise<void> {
+// 清空全部业务表并写入指定配置（单事务，失败回滚；configJson 由调用方序列化，避免循环依赖）。
+// 可选 seed 回调在同一事务内完成播种，保证「清空 + 配置 + 种子」原子提交
+export async function resetAllData(
+  configJson: string,
+  seed?: (db: SQLite.SQLiteDatabase) => Promise<void>
+): Promise<void> {
   const db = await getDb();
   await db.withTransactionAsync(async () => {
     await db.execAsync(
-      'DELETE FROM intake_log; DELETE FROM step_log; DELETE FROM food_item; DELETE FROM food_category;'
+      'DELETE FROM intake_log; DELETE FROM step_log; DELETE FROM food_item; DELETE FROM food_category; DELETE FROM app_config WHERE key = \'steps_connection\';'
     );
     await db.runAsync('INSERT OR REPLACE INTO app_config (key, value) VALUES (?, ?)', [
       'main',
       configJson,
     ]);
+    if (seed) await seed(db);
   });
 }
 
@@ -85,7 +109,7 @@ export async function restoreAllData(data: BackupData): Promise<void> {
   const db = await getDb();
   await db.withTransactionAsync(async () => {
     await db.execAsync(
-      'DELETE FROM intake_log; DELETE FROM step_log; DELETE FROM food_item; DELETE FROM food_category;'
+      'DELETE FROM intake_log; DELETE FROM step_log; DELETE FROM food_item; DELETE FROM food_category; DELETE FROM app_config WHERE key = \'steps_connection\';'
     );
     for (const c of data.food_categories) {
       await db.runAsync(
