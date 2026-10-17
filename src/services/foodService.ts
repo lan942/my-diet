@@ -448,6 +448,35 @@ export const SEED_FOODS: SeedFood[] = [
   { zh: '西兰花', en: 'Broccoli', category_zh: '抗氧化蔬菜', kcal: 34, protein: 2.8, carb: 7, fat: 0.4, portions: [{ zh: '1 杯切件', en: '1 Cup Chopped', grams: 90 }], notes_zh: '萝卜硫素抗癌抗炎，富含维 C', notes_en: 'Sulforaphane, rich in vitamin C' },
   { zh: '菠菜', en: 'Spinach', category_zh: '抗氧化蔬菜', kcal: 23, protein: 2.9, carb: 3.6, fat: 0.4, portions: [{ zh: '2 杯生菠菜', en: '2 Cups Raw', grams: 60 }], notes_zh: '叶黄素 + 铁，护眼补血', notes_en: 'Lutein & iron for eyes and blood' },
   { zh: '番茄', en: 'Tomato', category_zh: '抗氧化蔬菜', kcal: 18, protein: 0.9, carb: 3.9, fat: 0.2, notes_zh: '番茄红素，护心抗氧化', notes_en: 'Lycopene for heart health' },
+
+  // —— 中国家常食物（碳水）——
+  { zh: '馒头', en: 'Steamed Bun', category_zh: '碳水', kcal: 223, protein: 7, carb: 47, fat: 1.1, gi: 88, portions: [{ zh: '1 个（中等）', en: '1 Medium Bun', grams: 100 }, { zh: '半个', en: '1/2 Bun', grams: 50 }], notes_zh: '北方常见主食，高 GI 建议搭配蔬菜与蛋白', notes_en: 'Northern staple; high GI, pair with veggies & protein' },
+  { zh: '面条（煮熟）', en: 'Cooked Noodles', category_zh: '碳水', kcal: 110, protein: 3.9, carb: 22.2, fat: 0.4, portions: [{ zh: '1 小碗（熟）', en: '1 Small Bowl Cooked', grams: 150 }, { zh: '1 大碗（熟）', en: '1 Large Bowl Cooked', grams: 250 }], notes_zh: '熟重口径，普通小麦面条', notes_en: 'Cooked weight, plain wheat noodles' },
+  { zh: '白粥（大米）', en: 'Rice Congee', category_zh: '碳水', kcal: 46, protein: 1.1, carb: 9.9, fat: 0.3, gi: 69, portions: [{ zh: '1 碗', en: '1 Bowl', grams: 250 }, { zh: '1 小碗', en: '1 Small Bowl', grams: 150 }], notes_zh: '熟重口径，水分高易消化', notes_en: 'Cooked weight; hydrating and easy to digest' },
+  { zh: '鲜玉米', en: 'Corn on the Cob', category_zh: '碳水', kcal: 112, protein: 4, carb: 22.8, fat: 1.2, gi: 55, portions: [{ zh: '1 根（可食部）', en: '1 Cob (Edible Part)', grams: 150 }, { zh: '半根', en: '1/2 Cob', grams: 75 }], notes_zh: '可食部口径，整根带芯约一半可食', notes_en: 'Edible portion; about half a whole cob' },
+  { zh: '猪肉白菜水饺（熟）', en: 'Pork & Cabbage Dumplings (Boiled)', category_zh: '碳水', kcal: 238, protein: 8.5, carb: 24, fat: 11, portions: [{ zh: '1 个', en: '1 Dumpling', grams: 20 }, { zh: '10 个', en: '10 Dumplings', grams: 200 }], notes_zh: '水煮口径参考值，家常馅料差异较大', notes_en: 'Boiled reference value; homemade fillings vary' },
+
+  // —— 中国家常食物（蛋白质）——
+  { zh: '猪里脊（生）', en: 'Pork Tenderloin', category_zh: '蛋白质', kcal: 155, protein: 20.2, carb: 0.7, fat: 7.9, portions: [{ zh: '1 掌心大小', en: '1 Palm', grams: 100 }, { zh: '1 块', en: '1 Piece', grams: 150 }], notes_zh: '猪身上最瘦的部位，生重口径', notes_en: 'Leanest pork cut, raw weight' },
+  { zh: '五花肉（生）', en: 'Pork Belly', category_zh: '蛋白质', kcal: 518, protein: 7.7, carb: 0.9, fat: 53, portions: [{ zh: '1 小块', en: '1 Small Piece', grams: 50 }, { zh: '1 掌心大小', en: '1 Palm', grams: 100 }], notes_zh: '生重口径，脂肪含量高建议适量', notes_en: 'Raw weight; high in fat, enjoy in moderation' },
+  { zh: '鸡腿（带皮）', en: 'Chicken Leg (with Skin)', category_zh: '蛋白质', kcal: 181, protein: 16, carb: 0, fat: 12.5, portions: [{ zh: '1 个琵琶腿', en: '1 Drumstick', grams: 100 }, { zh: '1 只大鸡腿', en: '1 Whole Leg', grams: 150 }], notes_zh: '生重带皮口径，去皮可显著降脂', notes_en: 'Raw weight with skin; skinless cuts fat a lot' },
+  { zh: '瘦牛肉（生）', en: 'Lean Beef', category_zh: '蛋白质', kcal: 106, protein: 20.2, carb: 1.2, fat: 2.3, portions: [{ zh: '1 掌心大小', en: '1 Palm', grams: 100 }, { zh: '1 块', en: '1 Piece', grams: 150 }], notes_zh: '生重口径，铁与维生素 B12 丰富', notes_en: 'Raw weight; rich in iron & vitamin B12' },
+  { zh: '无糖豆浆', en: 'Unsweetened Soy Milk', category_zh: '蛋白质', kcal: 31, protein: 3, carb: 1.2, fat: 1.6, portions: [{ zh: '1 杯', en: '1 Cup', grams: 250 }], notes_zh: '市售浓度口径，植物蛋白饮品', notes_en: 'Store-bought concentration; plant protein drink' },
+
+  // —— 中国家常食物（脂肪）——
+  { zh: '花生（炒）', en: 'Roasted Peanuts', category_zh: '脂肪', kcal: 601, protein: 23.9, carb: 21.7, fat: 48.4, portions: [{ zh: '1 小把', en: '1 Handful', grams: 25 }, { zh: '20 粒', en: '20 Kernels', grams: 20 }], notes_zh: '烟酸与维生素 E 丰富，热量密集', notes_en: 'Niacin & vitamin E, calorie dense' },
+  { zh: '花生油', en: 'Peanut Oil', category_zh: '脂肪', kcal: 899, protein: 0, carb: 0, fat: 99.9, portions: [{ zh: '1 汤匙', en: '1 Tbsp', grams: 14 }, { zh: '1 茶匙', en: '1 Tsp', grams: 4.5 }], notes_zh: '家常炒菜常用油，注意控制用量', notes_en: 'Common Chinese cooking oil; watch portions' },
+
+  // —— 中国家常食物（抗氧化蔬菜）——
+  { zh: '黄瓜', en: 'Cucumber', category_zh: '抗氧化蔬菜', kcal: 16, protein: 0.8, carb: 2.9, fat: 0.2, portions: [{ zh: '1 根', en: '1 Cucumber', grams: 200 }, { zh: '半根', en: '1/2 Cucumber', grams: 100 }], notes_zh: '高水分低热量，清爽解腻', notes_en: 'Hydrating and low calorie' },
+  { zh: '大白菜', en: 'Napa Cabbage', category_zh: '抗氧化蔬菜', kcal: 17, protein: 1.4, carb: 2.4, fat: 0.2, portions: [{ zh: '1 份（约 2 杯）', en: '1 Serving (about 2 Cups)', grams: 150 }], notes_zh: '冬季当家菜，维 C 与钾', notes_en: 'Winter staple; vitamin C & potassium' },
+  { zh: '茄子', en: 'Eggplant', category_zh: '抗氧化蔬菜', kcal: 23, protein: 1.1, carb: 4.9, fat: 0.2, portions: [{ zh: '1 个中等', en: '1 Medium', grams: 200 }, { zh: '半个', en: '1/2 Medium', grams: 100 }], notes_zh: '花青素在茄皮，建议带皮烹调', notes_en: 'Anthocyanins in the skin; cook with skin on' },
+  { zh: '青椒（菜椒）', en: 'Green Bell Pepper', category_zh: '抗氧化蔬菜', kcal: 22, protein: 1, carb: 5.4, fat: 0.2, portions: [{ zh: '1 个', en: '1 Pepper', grams: 120 }, { zh: '半个', en: '1/2 Pepper', grams: 60 }], notes_zh: '维 C 高于柑橘，配菜百搭', notes_en: 'More vitamin C than oranges; versatile' },
+
+  // —— 中国家常食物（膳食纤维）——
+  { zh: '橙子', en: 'Orange', category_zh: '膳食纤维', kcal: 48, protein: 0.9, carb: 11.8, fat: 0.2, portions: [{ zh: '1 个中等', en: '1 Medium Orange', grams: 150 }, { zh: '半个', en: '1/2 Orange', grams: 75 }], notes_zh: '可食部口径，维 C 与类黄酮', notes_en: 'Edible portion; vitamin C & flavonoids' },
+  { zh: '西瓜', en: 'Watermelon', category_zh: '膳食纤维', kcal: 30, protein: 0.6, carb: 7.6, fat: 0.2, portions: [{ zh: '1 碗切块', en: '1 Bowl Cubed', grams: 200 }, { zh: '1 片', en: '1 Wedge', grams: 300 }], notes_zh: '可食部口径，高水分低能量密度', notes_en: 'Edible portion; hydrating, low energy density' },
+  { zh: '桃子', en: 'Peach', category_zh: '膳食纤维', kcal: 42, protein: 0.9, carb: 10.1, fat: 0.3, portions: [{ zh: '1 个中等', en: '1 Medium Peach', grams: 150 }, { zh: '半个', en: '1/2 Peach', grams: 75 }], notes_zh: '可食部口径，钾与膳食纤维', notes_en: 'Edible portion; potassium & fiber' },
 ];
 
 type SeedDb = Awaited<ReturnType<typeof getDb>>;

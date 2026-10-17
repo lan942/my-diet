@@ -47,9 +47,9 @@ function fixture(partial: Partial<FoodItem>): FoodItem {
 }
 
 describe('种子数据集完整性（精选高营养密度数据集）', () => {
-  it('约 33 条食物（31-36 之间）', () => {
-    expect(SEED_FOODS.length).toBeGreaterThanOrEqual(31);
-    expect(SEED_FOODS.length).toBeLessThanOrEqual(36);
+  it('约 52 条食物（49-53 之间，含中国家常批次）', () => {
+    expect(SEED_FOODS.length).toBeGreaterThanOrEqual(49);
+    expect(SEED_FOODS.length).toBeLessThanOrEqual(53);
   });
 
   it('每条种子均有营养亮点备注', () => {
@@ -119,6 +119,68 @@ describe('种子数据集完整性（精选高营养密度数据集）', () => {
       164, 8.9, 2.6, 27.4,
     ]);
     expect(chickpea.gi).toBeUndefined();
+  });
+});
+
+describe('中国家常食物数据集', () => {
+  it('19 条家常种子全部在库且分类分布正确', () => {
+    const zhNames = [
+      '馒头',
+      '面条（煮熟）',
+      '白粥（大米）',
+      '鲜玉米',
+      '猪肉白菜水饺（熟）',
+      '猪里脊（生）',
+      '五花肉（生）',
+      '鸡腿（带皮）',
+      '瘦牛肉（生）',
+      '无糖豆浆',
+      '花生（炒）',
+      '花生油',
+      '黄瓜',
+      '大白菜',
+      '茄子',
+      '青椒（菜椒）',
+      '橙子',
+      '西瓜',
+      '桃子',
+    ];
+    const byZh = new Map(SEED_FOODS.map((s) => [s.zh, s]));
+    for (const n of zhNames) {
+      expect(byZh.has(n)).toBe(true);
+    }
+    expect(byZh.get('馒头')!.category_zh).toBe('碳水');
+    expect(byZh.get('猪里脊（生）')!.category_zh).toBe('蛋白质');
+    expect(byZh.get('花生油')!.category_zh).toBe('脂肪');
+    expect(byZh.get('大白菜')!.category_zh).toBe('抗氧化蔬菜');
+    expect(byZh.get('橙子')!.category_zh).toBe('膳食纤维');
+  });
+
+  it('家常主食营养值口径：馒头高 GI、白粥熟重', () => {
+    const byZh = new Map(SEED_FOODS.map((s) => [s.zh, s]));
+    const bun = byZh.get('馒头')!;
+    expect([bun.kcal, bun.protein, bun.carb, bun.fat]).toEqual([223, 7, 47, 1.1]);
+    expect(bun.gi).toBe(88);
+    const congee = byZh.get('白粥（大米）')!;
+    expect([congee.kcal, congee.protein, congee.carb, congee.fat]).toEqual([46, 1.1, 9.9, 0.3]);
+    expect(congee.gi).toBe(69);
+    expect(congee.notes_zh).toContain('熟重');
+  });
+
+  it('家常蛋白营养值口径：里脊低脂、五花肉高脂如实录入', () => {
+    const byZh = new Map(SEED_FOODS.map((s) => [s.zh, s]));
+    const loin = byZh.get('猪里脊（生）')!;
+    expect([loin.kcal, loin.protein, loin.carb, loin.fat]).toEqual([155, 20.2, 0.7, 7.9]);
+    const belly = byZh.get('五花肉（生）')!;
+    expect([belly.kcal, belly.protein, belly.carb, belly.fat]).toEqual([518, 7.7, 0.9, 53]);
+    expect(belly.notes_zh).toContain('适量');
+  });
+
+  it('水果种子不带 gi（低 GI 标签语义限定碳水分类）', () => {
+    for (const zh of ['橙子', '西瓜', '桃子']) {
+      const fruit = SEED_FOODS.find((s) => s.zh === zh)!;
+      expect(fruit.gi ?? null).toBeNull();
+    }
   });
 });
 
@@ -289,6 +351,19 @@ describe('生活化份量（Household Portions）', () => {
     expect(chickpea.portions!.map((p) => p.en)).toEqual(['1/2 Cup Cooked', '1 Cup Cooked']);
   });
 
+  it('中式份量锚点：馒头按个、白粥按碗、水饺按个', () => {
+    const bun = SEED_FOODS.find((s) => s.zh === '馒头')!;
+    expect(bun.portions!.map((p) => p.grams)).toEqual([100, 50]);
+    expect(bun.portions!.map((p) => p.zh)).toEqual(['1 个（中等）', '半个']);
+    expect(bun.portions!.map((p) => p.en)).toEqual(['1 Medium Bun', '1/2 Bun']);
+    const congee = SEED_FOODS.find((s) => s.zh === '白粥（大米）')!;
+    expect(congee.portions!.map((p) => p.grams)).toEqual([250, 150]);
+    expect(congee.portions![0].zh).toBe('1 碗');
+    const dumpling = SEED_FOODS.find((s) => s.zh === '猪肉白菜水饺（熟）')!;
+    expect(dumpling.portions!.map((p) => p.grams)).toEqual([20, 200]);
+    expect(dumpling.portions!.map((p) => p.en)).toEqual(['1 Dumpling', '10 Dumplings']);
+  });
+
   it('parsePortions 合法 JSON 解析、非法回退 null', () => {
     const ok = JSON.stringify([{ zh: '1 片', en: '1 Slice', grams: 35 }]);
     expect(parsePortions(ok)).toEqual([{ zh: '1 片', en: '1 Slice', grams: 35 }]);
@@ -401,6 +476,7 @@ describe('ensureSeedFoods 种子升级补齐', () => {
     }
     expect(PORTION_BACKFILL_V180.has('白米饭')).toBe(false);
     expect(PORTION_BACKFILL_V180.has('鹰嘴豆')).toBe(false);
+    expect(PORTION_BACKFILL_V180.has('馒头')).toBe(false);
   });
 
   it('旧库缺失新种子时幂等插入白米饭与鹰嘴豆，历史种子 portions 回填仍执行', async () => {
@@ -457,6 +533,28 @@ describe('ensureSeedFoods 种子升级补齐', () => {
     const userChickpea = mutatedRows.find((r) => r.name === '鹰嘴豆')!;
     expect(userRice.portions).toBeNull();
     expect(userChickpea.portions).toBeNull();
+  });
+
+  it('旧库缺失「馒头」时幂等插入家常种子（完整数据含 gi 与份量），历史回填不受影响', async () => {
+    const oldNames = SEED_FOODS.map((s) => s.zh).filter((n) => n !== '馒头');
+    const { db, inserts, updates } = makeMockDb({ rows: oldNames.map(officialRow) });
+    mockedGetDb.mockResolvedValue(db as never);
+
+    await ensureSeedFoods();
+
+    expect(inserts).toHaveLength(1);
+    const bunInsert = inserts.find((p) => p[0] === '馒头')!;
+    expect(bunInsert).toBeDefined();
+    // category_id：碳水 order=1
+    expect(bunInsert[2]).toBe(1);
+    // gi（参数位 7）与 portions JSON（参数位 10）
+    expect(bunInsert[7]).toBe(88);
+    expect(JSON.parse(bunInsert[10] as string).map((p: { grams: number }) => p.grams)).toEqual([
+      100, 50,
+    ]);
+    // 回填 UPDATE 仍只针对 16 个历史种子
+    expect(updates).toHaveLength(16);
+    expect(updates.every((p) => p[1] !== '馒头')).toBe(true);
   });
 
   it('分类缺失时升级补齐跳过该条且不抛错', async () => {
