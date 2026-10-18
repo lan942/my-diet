@@ -23,4 +23,4 @@
 - [x] 4.1 新增 theme 测试：resolveTheme 三态解析、darkColors 与 lightColors 键集对等、normalizeConfig 对 theme_preference 缺省/非法值兜底
 - [x] 4.2 新增 i18n 双语 key 集合对齐守卫（既有模式）
 - [x] 4.3 `npx tsc --noEmit` / `npx vitest run` / `npx expo lint` / `openspec validate --strict` 全绿
-- [ ] 4.4 版本号顺延（app.json + build.gradle），构建 APK 打包 ZIP 交付设备验证（重点：系统深浅切换、强制深色、覆盖安装）
+- [x] 4.4 版本号顺延（app.json + build.gradle），构建 APK 打包 ZIP 交付设备验证（重点：系统深浅切换、强制深色、覆盖安装）

@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import Card from '../components/Card';
@@ -18,6 +19,7 @@ import Toast, { useToast } from '../components/Toast';
 import DateBar from '../components/DateBar';
 import ProgressBar from '../components/ProgressBar';
 import ActionSheet from '../components/ActionSheet';
+import EditSheet from '../components/EditSheet';
 import { spacing, macroColors, typeScale, type ThemeColors } from '../theme';
 import { useTheme } from '../theme/ThemeContext';
 import { useApp } from '../state/AppContext';
@@ -30,6 +32,11 @@ import {
 } from '../services/intakeService';
 import { computeTarget } from '../services/targetService';
 import { computeEnergyBalance } from '../services/energyBalance';
+import {
+  recordManualSteps,
+  clearStepRecord,
+  MAX_MANUAL_STEPS,
+} from '../services/stepService';
 import { useDeviceSteps } from '../hooks/useDeviceSteps';
 import { foodDisplayName, isLowGI } from '../services/foodService';
 import type { DailyNutrition, TargetResult } from '../types';
@@ -98,6 +105,11 @@ export default function IntakeScreen() {
   const [saving, setSaving] = useState(false);
   // 待删除记录（ActionSheet 二次确认，禁用系统 Alert）
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  // 步数手动录入抽屉（EditSheet，禁用系统 Alert）
+  const [showStepsEdit, setShowStepsEdit] = useState(false);
+  const [stepsInput, setStepsInput] = useState('');
+  const [stepsError, setStepsError] = useState('');
+  const [stepsSaving, setStepsSaving] = useState(false);
   const { toast, toastOpacity, showToast } = useToast();
 
   // 首次连接：唯一会触发系统健康权限弹窗的路径
@@ -107,15 +119,70 @@ export default function IntakeScreen() {
     else if (result === 'unavailable') showToast(t('sync.unavailable'));
   }
 
-  // 已连接后的手动刷新
+  // 已连接后的手动刷新（manual 日跳过：用户显式覆盖值优先于平台）
   async function handleSyncSteps() {
+    if (deviceSteps.source === 'manual') {
+      showToast(t('steps.manualSkipToast'));
+      return;
+    }
     const result = await deviceSteps.syncNow();
     if (result.ok) {
       showToast(t('sync.success', { steps: formatNumber(result.steps) }));
+    } else if (result.reason === 'manual-override') {
+      showToast(t('steps.manualSkipToast'));
     } else {
       showToast(
         result.reason === 'unavailable' ? t('sync.unavailable') : t('sync.denied')
       );
+    }
+  }
+
+  // 打开步数编辑抽屉：预填当日当前值（无记录为空）
+  function openStepsEdit() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setStepsInput(deviceSteps.steps === null ? '' : String(deviceSteps.steps));
+    setStepsError('');
+    setShowStepsEdit(true);
+  }
+
+  // 保存手动步数：前置校验 → 服务层校验（非负整数 ≤ 上限）→ 原地 refresh
+  async function handleStepsSave() {
+    if (stepsSaving) return;
+    const raw = stepsInput.trim();
+    const n = /^\d+$/.test(raw) ? Number(raw) : NaN;
+    if (!Number.isInteger(n) || n < 0 || n > MAX_MANUAL_STEPS) {
+      setStepsError(t('steps.editInvalid'));
+      return;
+    }
+    setStepsSaving(true);
+    setStepsError('');
+    try {
+      await recordManualSteps(currentDate, n);
+      await refresh();
+      setShowStepsEdit(false);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      showToast(t('steps.manualSaved'));
+    } catch (e: unknown) {
+      setStepsError(tError(e));
+    } finally {
+      setStepsSaving(false);
+    }
+  }
+
+  // 清除手动值：删行后该日恢复平台权威（后续自动同步可重新写入）
+  async function handleStepsClear() {
+    if (stepsSaving) return;
+    setStepsSaving(true);
+    setStepsError('');
+    try {
+      await clearStepRecord(currentDate);
+      await refresh();
+      setShowStepsEdit(false);
+      showToast(t('steps.manualCleared'));
+    } catch {
+      setStepsError(t('steps.saveFailed'));
+    } finally {
+      setStepsSaving(false);
     }
   }
 
@@ -140,6 +207,9 @@ export default function IntakeScreen() {
     setMeal('lunch');
     setShowPicker(false);
     setFormError('');
+    setShowStepsEdit(false);
+    setStepsInput('');
+    setStepsError('');
   }
 
   const logsWithNames = useMemo(() => {
@@ -198,35 +268,102 @@ export default function IntakeScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <DateBar date={currentDate} onChange={setCurrentDate} />
 
-        {/* 步数（设备自动同步） */}
+        {/* 步数（设备自动同步 + 手动录入覆盖） */}
         <Card>
           <View style={styles.stepsHeader}>
             <Text style={styles.cardTitle} maxFontSizeMultiplier={1.4}>
               {t('steps.cardTitle')}
             </Text>
-            {deviceSteps.syncState === 'connected' ||
-            deviceSteps.syncState === 'syncing' ? (
+            <View style={styles.stepsHeaderActions}>
+              {/* 编辑入口：所有同步态可点（含平台不可用/权限拒绝降级态的手动兜底） */}
               <Pressable
-                onPress={handleSyncSteps}
-                style={styles.syncButton}
-                disabled={deviceSteps.syncState === 'syncing'}
-                accessibilityLabel={t('sync.button')}
+                onPress={openStepsEdit}
+                style={styles.editButton}
+                accessibilityRole="button"
+                accessibilityLabel={t('steps.editTitle')}
               >
-                {deviceSteps.syncState === 'syncing' ? (
-                  <ActivityIndicator size="small" color={macroColors.steps} />
-                ) : (
-                  <Ionicons name="refresh" size={18} color={macroColors.steps} />
-                )}
+                <Ionicons name="pencil" size={17} color={macroColors.steps} />
               </Pressable>
-            ) : null}
+              {deviceSteps.syncState === 'connected' ||
+              deviceSteps.syncState === 'syncing' ? (
+                <Pressable
+                  onPress={handleSyncSteps}
+                  style={styles.syncButton}
+                  disabled={deviceSteps.syncState === 'syncing'}
+                  accessibilityLabel={t('sync.button')}
+                >
+                  {deviceSteps.syncState === 'syncing' ? (
+                    <ActivityIndicator size="small" color={macroColors.steps} />
+                  ) : (
+                    <Ionicons name="refresh" size={18} color={macroColors.steps} />
+                  )}
+                </Pressable>
+              ) : null}
+            </View>
           </View>
 
-          {deviceSteps.syncState === 'unavailable' ? (
+          {/* 有记录时值优先展示（manual/legacy 记录不依赖连接状态） */}
+          {deviceSteps.steps !== null ||
+          deviceSteps.syncState === 'connected' ||
+          deviceSteps.syncState === 'syncing' ? (
+            <>
+              <View style={styles.stepsRow}>
+                <Ionicons name="footsteps" size={26} color={macroColors.steps} />
+                {deviceSteps.steps === null &&
+                deviceSteps.syncState === 'syncing' ? (
+                  <Text style={styles.stepsSyncingText} maxFontSizeMultiplier={1.4}>
+                    {t('steps.syncing')}
+                  </Text>
+                ) : (
+                  <Text style={styles.stepsValue} maxFontSizeMultiplier={2}>
+                    {deviceSteps.steps === null
+                      ? '—'
+                      : formatNumber(deviceSteps.steps)}
+                  </Text>
+                )}
+                <Text style={styles.stepsUnit} maxFontSizeMultiplier={1.4}>
+                  {t('steps.unit')}
+                </Text>
+                {deviceSteps.source === 'manual' ? (
+                  <Text style={styles.manualTag} maxFontSizeMultiplier={1.4}>
+                    {t('steps.manualTag')}
+                  </Text>
+                ) : null}
+                <Text style={styles.stepsKcal} maxFontSizeMultiplier={1.4}>
+                  {t('steps.kcalHint', {
+                    kcal: (balance?.stepsKcal ?? 0).toFixed(0),
+                  })}
+                </Text>
+              </View>
+              {deviceSteps.syncState === 'unavailable' ? (
+                <Text style={styles.stepsHint} maxFontSizeMultiplier={1.4}>
+                  {t('sync.unavailable')}
+                </Text>
+              ) : null}
+              {deviceSteps.syncState === 'not-connected' ||
+              deviceSteps.syncState === 'denied' ? (
+                <View style={styles.connectBox}>
+                  {deviceSteps.syncState === 'denied' ? (
+                    <Text style={styles.formError} maxFontSizeMultiplier={1.4}>
+                      {t('sync.denied')}
+                    </Text>
+                  ) : null}
+                  <Text style={styles.stepsHint} maxFontSizeMultiplier={1.4}>
+                    {t('sync.rationale')}
+                  </Text>
+                  <Button
+                    title={t('steps.connect')}
+                    variant="ghost"
+                    onPress={handleConnectSteps}
+                  />
+                </View>
+              ) : null}
+            </>
+          ) : deviceSteps.syncState === 'unavailable' ? (
             <Text style={styles.stepsHint} maxFontSizeMultiplier={1.4}>
               {t('sync.unavailable')}
             </Text>
-          ) : deviceSteps.syncState === 'not-connected' ||
-            deviceSteps.syncState === 'denied' ? (
+          ) : (
             <View style={styles.connectBox}>
               <Text style={styles.stepsStatus} maxFontSizeMultiplier={1.4}>
                 {t('steps.notConnected')}
@@ -244,28 +381,6 @@ export default function IntakeScreen() {
                 variant="ghost"
                 onPress={handleConnectSteps}
               />
-            </View>
-          ) : (
-            <View style={styles.stepsRow}>
-              <Ionicons name="footsteps" size={26} color={macroColors.steps} />
-              {deviceSteps.steps === null &&
-              deviceSteps.syncState === 'syncing' ? (
-                <Text style={styles.stepsSyncingText} maxFontSizeMultiplier={1.4}>
-                  {t('steps.syncing')}
-                </Text>
-              ) : (
-                <Text style={styles.stepsValue} maxFontSizeMultiplier={2}>
-                  {deviceSteps.steps === null ? '—' : formatNumber(deviceSteps.steps)}
-                </Text>
-              )}
-              <Text style={styles.stepsUnit} maxFontSizeMultiplier={1.4}>
-                {t('steps.unit')}
-              </Text>
-              <Text style={styles.stepsKcal} maxFontSizeMultiplier={1.4}>
-                {t('steps.kcalHint', {
-                  kcal: (balance?.stepsKcal ?? 0).toFixed(0),
-                })}
-              </Text>
             </View>
           )}
         </Card>
@@ -484,6 +599,36 @@ export default function IntakeScreen() {
         onConfirm={handleDeleteConfirm}
         onClose={() => setDeleteId(null)}
       />
+
+      {/* 步数手动录入（自定义编辑抽屉：保存/清除手动值，禁系统 Alert） */}
+      <EditSheet
+        visible={showStepsEdit}
+        title={t('steps.editTitle')}
+        hint={t('steps.editHint')}
+        error={stepsError}
+        saving={stepsSaving}
+        onClose={() => setShowStepsEdit(false)}
+        onSave={handleStepsSave}
+      >
+        <TextField
+          label={t('steps.editLabel')}
+          value={stepsInput}
+          onChangeText={(v) => {
+            setStepsInput(v);
+            setStepsError('');
+          }}
+          keyboardType="numeric"
+          placeholder={t('steps.editPh')}
+        />
+        {deviceSteps.source === 'manual' ? (
+          <Button
+            title={t('steps.clearManual')}
+            variant="ghost"
+            onPress={handleStepsClear}
+            disabled={stepsSaving}
+          />
+        ) : null}
+      </EditSheet>
     </SafeAreaView>
   );
 }
@@ -510,6 +655,11 @@ const makeStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  stepsHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
   syncButton: {
     width: 44,
     minHeight: 44,
@@ -517,6 +667,25 @@ const makeStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 22,
     backgroundColor: colors.accentSoft,
+  },
+  editButton: {
+    width: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 22,
+    backgroundColor: colors.accentSoft,
+  },
+  manualTag: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: macroColors.steps,
+    borderWidth: 1,
+    borderColor: macroColors.steps,
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    overflow: 'hidden',
   },
   stepsRow: {
     flexDirection: 'row',

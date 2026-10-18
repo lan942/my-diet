@@ -122,17 +122,14 @@ describe('recordPlatformSteps 平台权威覆盖', () => {
     mockedGetDb.mockReset();
   });
 
-  it('已有 manual 记录：平台值无条件覆盖且 source 转 platform', async () => {
+  it('已有 manual 记录：平台值跳过写入（用户显式覆盖值受保护），返回既有行', async () => {
     const { db, runAsync } = makeMockDb(rowOf(1, '2026-10-10', 5000, 'manual'));
     mockedGetDb.mockResolvedValue(db);
 
     const result = await recordPlatformSteps('2026-10-10', 8000);
-    expect(result.steps).toBe(8000);
-    expect(result.source).toBe('platform');
-    expect(runAsync).toHaveBeenCalledWith(
-      'UPDATE step_log SET steps = ?, source = ?, created_at = ? WHERE id = ?',
-      [8000, 'platform', '2026-10-10 12:00:00', 1]
-    );
+    expect(result.steps).toBe(5000);
+    expect(result.source).toBe('manual');
+    expect(runAsync).not.toHaveBeenCalled(); // 无 UPDATE/INSERT，不覆盖
   });
 
   it('已有 platform 记录且新值下降：仍以平台新值覆盖（数据源更正）', async () => {
@@ -148,12 +145,14 @@ describe('recordPlatformSteps 平台权威覆盖', () => {
     );
   });
 
-  it('已有 source 缺省旧行：覆盖后归一化为 platform', async () => {
-    const { db } = makeMockDb(rowOf(1, '2026-10-10', 5000, null));
+  it('已有 source 缺省旧行（升级遗留）：视为手动覆盖值，平台读取跳过不归一化', async () => {
+    const { db, runAsync } = makeMockDb(rowOf(1, '2026-10-10', 5000, null));
     mockedGetDb.mockResolvedValue(db);
 
     const result = await recordPlatformSteps('2026-10-10', 6000);
-    expect(result.source).toBe('platform');
+    expect(result.steps).toBe(5000);
+    expect(result.source).toBe('manual'); // 展示层与保护语义一致
+    expect(runAsync).not.toHaveBeenCalled();
   });
 
   it('无记录：事务内插入 platform 来源', async () => {

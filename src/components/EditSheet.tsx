@@ -11,6 +11,8 @@ import {
   StyleSheet,
   Animated,
   PanResponder,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -88,13 +90,19 @@ export default function EditSheet({
     >
       <View style={styles.mask}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <Animated.View
-          style={[
-            styles.sheet,
-            { paddingBottom: spacing.xl + 8 + insets.bottom },
-            { transform: [{ translateY }] },
-          ]}
+        {/* 键盘弹出时抬高抽屉：iOS padding / Android height（窗口已缩放时偏移为零） */}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.avoid}
+          pointerEvents="box-none"
         >
+          <Animated.View
+            style={[
+              styles.sheet,
+              { paddingBottom: spacing.xl + 8 + insets.bottom },
+              { transform: [{ translateY }] },
+            ]}
+          >
           {/* 头部：下拉手势区 */}
           <View {...panResponder.panHandlers}>
             <View style={styles.grabber} />
@@ -127,7 +135,8 @@ export default function EditSheet({
             onPress={onSave}
             disabled={saving}
           />
-        </Animated.View>
+          </Animated.View>
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );
@@ -138,6 +147,12 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.35)',
     justifyContent: 'flex-end',
+  },
+  // 键盘避让容器：占满宽度让 sheet 底部锚定，box-none 放行遮罩点击关闭
+  avoid: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    width: '100%',
   },
   sheet: {
     backgroundColor: colors.card,

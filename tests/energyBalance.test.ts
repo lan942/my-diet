@@ -68,6 +68,19 @@ describe('computeEnergyBalance 能量平衡', () => {
     expect(b.remaining).toBe(10);
   });
 
+  it('manual 来源步数同样派生消耗（来源标记不影响能量平衡，6000 × 0.0005 × 70 = 210）', () => {
+    // energyBalance 只依赖 steps 数值：手动录入与平台同步走同一派生路径
+    const b = computeEnergyBalance({
+      targetKcal: 2000,
+      intakeKcal: 1500,
+      steps: 6000,
+      weightKg: 70,
+    });
+    expect(b.stepsKcal).toBe(210);
+    expect(b.adjustedCalorie).toBe(2210);
+    expect(b.netKcal).toBe(1290); // 1500 - 210
+  });
+
   it('宏量目标不受步数影响（本函数只动热量口径，不产出宏量值）', () => {
     const without = computeEnergyBalance({
       targetKcal: 2000,

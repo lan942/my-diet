@@ -205,13 +205,24 @@ export const zh: Record<TranslationKey, string> = {
   'food.addedToast': '已加入今日 ✓',
   'food.quickLogFailed': '记录失败',
 
-  // Steps（今日页设备自动同步）
+  // Steps（今日页设备自动同步 + 手动录入）
   'steps.cardTitle': '步数',
   'steps.unit': '步',
   'steps.kcalHint': '≈ 消耗 {kcal} kcal',
   'steps.connect': '连接健康应用',
   'steps.syncing': '同步中…',
   'steps.notConnected': '尚未连接',
+  'steps.editTitle': '编辑步数',
+  'steps.editHint': '手动录入当前查看日期的步数，保存后以手动值为准（平台不再覆盖该日）',
+  'steps.editLabel': '步数',
+  'steps.editPh': '例如 8000',
+  'steps.editInvalid': '请输入 0–100000 之间的整数步数',
+  'steps.clearManual': '清除手动值（恢复自动同步）',
+  'steps.manualTag': '手动',
+  'steps.manualSkipToast': '当日为手动录入，已跳过平台同步',
+  'steps.manualSaved': '已更新步数',
+  'steps.manualCleared': '已清除手动值，恢复自动同步',
+  'steps.saveFailed': '保存失败，请重试',
 
   // 能量平衡
   'energy.net': '净热量',

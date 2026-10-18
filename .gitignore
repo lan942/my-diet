@@ -18,6 +18,7 @@ android/local.properties
 android/.keystore
 android/.gradle
 android/build
+android/build_log.txt
 android/app/build
 android/.idea
 android/*.iml

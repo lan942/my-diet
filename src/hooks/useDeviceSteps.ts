@@ -2,6 +2,7 @@
 // - 可用性静默探测（不索权）；授权仅由用户点「连接」触发
 // - 授权后在页面 focus / App 回前台 / 切日时自动读取当前查看日期（支持历史日期）
 // - 同日期读取单飞、15s 成功节流、seq 令牌丢弃跨日期迟到结果
+// - 当日为 manual 行（用户显式覆盖值）时跳过平台写入，清除后恢复
 // - 写入成功后原地 refresh（严禁 setLoading，避免导航树卸载跳 Tab）
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -15,6 +16,7 @@ import {
 } from '../services/platformSteps';
 import { recordPlatformSteps } from '../services/stepService';
 import { getStepsConnection, setStepsConnected } from '../services/connectionStore';
+import type { StepSource } from '../types';
 
 export type StepSyncUiState =
   | 'unavailable'
@@ -26,7 +28,7 @@ export type StepSyncUiState =
 export type ConnectResult = 'granted' | 'denied' | 'unavailable';
 export type SyncResult =
   | { ok: true; steps: number }
-  | { ok: false; reason: 'denied' | 'unavailable' };
+  | { ok: false; reason: 'denied' | 'unavailable' | 'manual-override' };
 
 const SUCCESS_THROTTLE_MS = 15_000;
 
@@ -34,6 +36,8 @@ export interface DeviceSteps {
   availability: PlatformStepsAvailability | 'unknown';
   syncState: StepSyncUiState;
   steps: number | null;
+  /** 当前查看日期记录来源：manual=用户显式覆盖，platform=平台同步，null=无记录 */
+  source: StepSource | null;
   connect: () => Promise<ConnectResult>;
   syncNow: () => Promise<SyncResult>;
 }
@@ -60,9 +64,19 @@ export function useDeviceSteps(date: string): DeviceSteps {
   // 各日期上次成功读取时间戳（节流）
   const lastSuccessAtRef = useRef<Map<string, number>>(new Map());
 
-  // 当前查看日期步数：本地 step_log 为唯一展示来源，同步写入经 refresh 后更新
+  // stepLogs 镜像 ref：供 syncDate 等稳定回调读取当日来源，避免回调身份随数据变化
+  const stepLogsRef = useRef(stepLogs);
+  useEffect(() => {
+    stepLogsRef.current = stepLogs;
+  }, [stepLogs]);
+
+  // 当前查看日期步数与来源：本地 step_log 为唯一展示来源，同步写入经 refresh 后更新
   const steps = useMemo(
     () => stepLogs.find((s) => s.date === date)?.steps ?? null,
+    [stepLogs, date]
+  );
+  const source = useMemo<StepSource | null>(
+    () => stepLogs.find((s) => s.date === date)?.source ?? null,
     [stepLogs, date]
   );
 
@@ -102,6 +116,9 @@ export function useDeviceSteps(date: string): DeviceSteps {
 
   const syncDate = useCallback(
     async (d: string, manual: boolean): Promise<number | null> => {
+      // manual 行为用户显式覆盖值：跳过平台同步（含授权后的强制同步），清除后恢复
+      const existing = stepLogsRef.current.find((s) => s.date === d);
+      if (existing?.source === 'manual') return null;
       if (!manual) {
         const last = lastSuccessAtRef.current.get(d) ?? 0;
         if (Date.now() - last < SUCCESS_THROTTLE_MS) return null;
@@ -189,8 +206,15 @@ export function useDeviceSteps(date: string): DeviceSteps {
     return 'granted';
   }, [probe, syncDate]);
 
-  // 已连接用户的手动刷新（撤销授权/读取失败时暴露 denied）
+  // 已连接用户的手动刷新（撤销授权/读取失败时暴露 denied；manual 日返回跳过标记）
   const syncNow = useCallback(async (): Promise<SyncResult> => {
+    // manual 日提前早退：省一次平台可用性探测
+    const existing = stepLogsRef.current.find(
+      (x) => x.date === dateRef.current
+    );
+    if (existing?.source === 'manual') {
+      return { ok: false, reason: 'manual-override' };
+    }
     const s = await probe();
     if (s !== 'available') return { ok: false, reason: 'unavailable' };
     const read = await syncDate(dateRef.current, true);
@@ -210,5 +234,5 @@ export function useDeviceSteps(date: string): DeviceSteps {
     return 'not-connected';
   }, [availability, syncing, denied, connected]);
 
-  return { availability, syncState, steps, connect, syncNow };
+  return { availability, syncState, steps, source, connect, syncNow };
 }

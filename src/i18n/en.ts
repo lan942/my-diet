@@ -208,13 +208,25 @@ export const en = {
   'food.addedToast': 'Added to today ✓',
   'food.quickLogFailed': 'Failed to add',
 
-  // Steps (device-synced on Today)
+  // Steps (device-synced on Today + manual entry)
   'steps.cardTitle': 'Steps',
   'steps.unit': 'steps',
   'steps.kcalHint': '≈ {kcal} kcal burned',
   'steps.connect': 'Connect Health App',
   'steps.syncing': 'Syncing…',
   'steps.notConnected': 'Not connected yet',
+  'steps.editTitle': 'Edit Steps',
+  'steps.editHint':
+    'Enter steps for the viewed date. The manual value overrides platform sync for that day until cleared.',
+  'steps.editLabel': 'Steps',
+  'steps.editPh': 'e.g. 8000',
+  'steps.editInvalid': 'Enter a whole number between 0 and 100000',
+  'steps.clearManual': 'Clear manual value (resume auto sync)',
+  'steps.manualTag': 'Manual',
+  'steps.manualSkipToast': 'Manual value in effect — platform sync skipped',
+  'steps.manualSaved': 'Steps updated',
+  'steps.manualCleared': 'Manual value cleared, auto sync resumed',
+  'steps.saveFailed': 'Save failed, please retry',
 
   // Energy balance
   'energy.net': 'Net kcal',
