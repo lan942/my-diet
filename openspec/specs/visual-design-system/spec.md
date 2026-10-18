@@ -1,7 +1,7 @@
 # visual-design-system Specification
 
 ## Purpose
-TBD - created by archiving change modernize-diet-tracker-experience. Update Purpose after archive.
+Defines the cohesive visual language of NutriPulse across light and dark themes: shared color tokens, spacing, typography, radii, elevation, semantic nutrition colors, iconography, and layout rules that keep every screen consistent, readable, and accessible.
 ## Requirements
 ### Requirement: Consistent modern light visual system
 The application SHALL provide a cohesive light-theme visual system across Today, Food Library, Profile, onboarding, shared controls, and bottom navigation. Shared colors, spacing, typography, corner radii, and elevation SHALL be defined centrally and reused. Nutrition semantic colors SHALL retain their established meaning. Text and controls SHALL maintain readable contrast and SHALL NOT rely on color alone to communicate status.

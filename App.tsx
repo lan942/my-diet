@@ -1,9 +1,11 @@
 // 应用入口：首启引导门控 + 3 底部 Tab
 
+import { useMemo } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import {
   NavigationContainer,
   DefaultTheme,
+  DarkTheme,
 } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
@@ -12,7 +14,8 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 
 import { AppProvider, useApp } from './src/state/AppContext';
 import { Button } from './src/components/ui';
-import { colors, spacing, typeScale } from './src/theme';
+import { spacing, typeScale } from './src/theme';
+import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { t } from './src/i18n';
 import './src/i18n/detect';
 import ProfileScreen from './src/screens/ProfileScreen';
@@ -57,6 +60,7 @@ function tabIcon(
 }
 
 function RootTabs() {
+  const { colors } = useTheme();
   // 自定义 tabBarStyle 会整体覆盖导航库默认的 paddingBottom: insets.bottom，
   // 必须手动把底部安全区（手势条/系统导航栏高度）加回来，否则 Tab 会被系统条遮挡
   const insets = useSafeAreaInsets();
@@ -102,6 +106,7 @@ function RootTabs() {
 }
 
 function Root() {
+  const { colors } = useTheme();
   const { config, loading, bootError, retryBoot } = useApp();
   if (bootError && !config) {
     return (
@@ -144,26 +149,38 @@ function Root() {
   return <RootTabs />;
 }
 
+// 导航主题与状态栏随主题联动（必须在 ThemeProvider 内部取色）
+function ThemedApp() {
+  const { colors, isDark } = useTheme();
+  const navTheme = useMemo(() => {
+    const base = isDark ? DarkTheme : DefaultTheme;
+    return {
+      ...base,
+      colors: {
+        ...base.colors,
+        background: colors.bg,
+        card: colors.card,
+        border: colors.line,
+        text: colors.text,
+        primary: colors.accent,
+      },
+    };
+  }, [colors, isDark]);
+  return (
+    <NavigationContainer theme={navTheme}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <Root />
+    </NavigationContainer>
+  );
+}
+
 export default function App() {
   return (
     <AppProvider>
       <SafeAreaProvider>
-        <NavigationContainer
-          theme={{
-            ...DefaultTheme,
-            colors: {
-              ...DefaultTheme.colors,
-              background: colors.bg,
-              card: colors.card,
-              border: colors.line,
-              text: colors.text,
-              primary: colors.accent,
-            },
-          }}
-        >
-          <StatusBar style="auto" />
-          <Root />
-        </NavigationContainer>
+        <ThemeProvider>
+          <ThemedApp />
+        </ThemeProvider>
       </SafeAreaProvider>
     </AppProvider>
   );

@@ -52,6 +52,8 @@ export type Gender = 'male' | 'female' | 'unknown';
 
 export type UnitSystem = 'metric' | 'us';
 
+export type ThemePreference = 'system' | 'light' | 'dark';
+
 export interface AppConfig {
   // 用户基础档案（用于 BMR/TDEE 计算）
   gender: Gender;
@@ -66,6 +68,7 @@ export interface AppConfig {
   // 引导与偏好
   onboarded: boolean;
   unit_system: UnitSystem;
+  theme_preference: ThemePreference;
 }
 
 export interface TargetResult {

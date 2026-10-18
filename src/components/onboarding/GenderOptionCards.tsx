@@ -1,11 +1,12 @@
 // 性别选项卡列表（受控组件）：首启引导第 3 步与「我的」Biological Sex 编辑抽屉共用
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
-import { colors, spacing } from '../../theme';
+import { spacing, type ThemeColors } from '../../theme';
+import { useTheme } from '../../theme/ThemeContext';
 import { t, type TranslationKey } from '../../i18n';
 import type { Gender } from '../../types';
 
@@ -28,6 +29,8 @@ interface GenderOptionCardsProps {
 }
 
 export default function GenderOptionCards({ value, onChange }: GenderOptionCardsProps) {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
   return (
     <View>
       {GENDER_OPTIONS.map((o) => {
@@ -62,7 +65,7 @@ export default function GenderOptionCards({ value, onChange }: GenderOptionCards
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   genderCard: {
     flexDirection: 'row',
     alignItems: 'center',

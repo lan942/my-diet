@@ -1,7 +1,7 @@
 // 快速记录抽屉：份量刻度尺 + 预设快捷片 + 餐次分段 + 实时营养预览 + Add to Today
 // 视觉沿用 EditSheet 壳：grabber + 手势下拉关闭 + 遮罩点击关闭
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Modal,
   View,
@@ -18,7 +18,8 @@ import * as Haptics from 'expo-haptics';
 import RulerPicker from './RulerPicker';
 import SegmentedControl, { type SegmentOption } from './SegmentedControl';
 import { Button } from './ui';
-import { colors, spacing, macroColors } from '../theme';
+import { spacing, macroColors, type ThemeColors } from '../theme';
+import { useTheme } from '../theme/ThemeContext';
 import { t, tError } from '../i18n';
 import { defaultMealFor, scaleNutrition } from '../services/intakeService';
 import { foodDisplayName, foodPortionLabel } from '../services/foodService';
@@ -72,6 +73,8 @@ export default function QuickLogSheet({
   onClose,
   onAdd,
 }: QuickLogSheetProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const [translateY] = useState(() => new Animated.Value(0));
   // 保存进行中锁定关闭通道（遮罩/返回键/下拉手势），避免抽屉卸载导致失败反馈丢失
@@ -167,6 +170,8 @@ function QuickLogBody({
   onAdd: (grams: number, meal: string) => Promise<void>;
   busy: boolean;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const portions = food.portions;
   const hasPortions = !!portions && portions.length > 0;
   const [mode, setMode] = useState<'portions' | 'grams'>(() => (hasPortions ? 'portions' : 'grams'));
@@ -367,7 +372,7 @@ function QuickLogBody({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   mask: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.35)',

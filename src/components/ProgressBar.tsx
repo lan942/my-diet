@@ -1,8 +1,9 @@
 // 达成率进度条
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { colors, spacing } from '../theme';
+import { spacing, type ThemeColors } from '../theme';
+import { useTheme } from '../theme/ThemeContext';
 
 interface ProgressBarProps {
   label: string;
@@ -11,7 +12,7 @@ interface ProgressBarProps {
   unit?: string;
 }
 
-function colorFor(ratio: number): string {
+function colorFor(colors: ThemeColors, ratio: number): string {
   if (ratio >= 1) return colors.ok;
   if (ratio >= 0.7) return colors.warn;
   return colors.danger;
@@ -23,10 +24,12 @@ export default function ProgressBar({
   target,
   unit = '',
 }: ProgressBarProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const ratio = target > 0 ? current / target : 0;
   const clamped = Math.min(ratio, 1);
   const percent = Math.round(ratio * 100);
-  const barColor = colorFor(ratio);
+  const barColor = colorFor(colors, ratio);
 
   return (
     <View style={styles.wrap}>
@@ -51,36 +54,37 @@ export default function ProgressBar({
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: {
-    marginBottom: spacing.sm,
-  },
-  row: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: spacing.xs,
-  },
-  label: {
-    fontSize: 13,
-    color: colors.text,
-    fontWeight: '500',
-    flexShrink: 1,
-  },
-  value: {
-    fontSize: 12,
-    color: colors.muted,
-    flexShrink: 1,
-    textAlign: 'right',
-  },
-  track: {
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.line,
-    overflow: 'hidden',
-  },
-  fill: {
-    height: '100%',
-    borderRadius: 4,
-  },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    wrap: {
+      marginBottom: spacing.sm,
+    },
+    row: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'space-between',
+      marginBottom: spacing.xs,
+    },
+    label: {
+      fontSize: 13,
+      color: colors.text,
+      fontWeight: '500',
+      flexShrink: 1,
+    },
+    value: {
+      fontSize: 12,
+      color: colors.muted,
+      flexShrink: 1,
+      textAlign: 'right',
+    },
+    track: {
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: colors.line,
+      overflow: 'hidden',
+    },
+    fill: {
+      height: '100%',
+      borderRadius: 4,
+    },
+  });

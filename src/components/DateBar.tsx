@@ -1,9 +1,10 @@
 // 日期切换条
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing } from '../theme';
+import { spacing, type ThemeColors } from '../theme';
+import { useTheme } from '../theme/ThemeContext';
 import { t, formatDateShort } from '../i18n';
 
 interface DateBarProps {
@@ -40,6 +41,8 @@ function friendly(date: string): string {
 }
 
 export default function DateBar({ date, onChange }: DateBarProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   // 不允许进入未来日期（摄入/步数均按所选日期落库）
   const atToday = isToday(date);
   return (
@@ -76,28 +79,29 @@ export default function DateBar({ date, onChange }: DateBarProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  bar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.sm,
-  },
-  arrowButton: {
-    width: 44,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 22,
-    backgroundColor: colors.card,
-  },
-  arrowPressed: {
-    opacity: 0.65,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-    marginHorizontal: spacing.md,
-  },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    bar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: spacing.sm,
+    },
+    arrowButton: {
+      width: 44,
+      minHeight: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 22,
+      backgroundColor: colors.card,
+    },
+    arrowPressed: {
+      opacity: 0.65,
+    },
+    label: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.text,
+      marginHorizontal: spacing.md,
+    },
+  });

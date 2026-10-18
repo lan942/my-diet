@@ -1,8 +1,9 @@
 // iOS 风格分段选择器：滑动滑块高亮，用于单位切换等二/三选一场景
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { cardShadow, colors, radius } from '../theme';
+import { cardShadowLight, radius, type ThemeColors } from '../theme';
+import { useTheme } from '../theme/ThemeContext';
 
 export interface SegmentOption<T extends string> {
   label: string;
@@ -20,6 +21,8 @@ export default function SegmentedControl<T extends string>({
   value,
   onChange,
 }: SegmentedControlProps<T>) {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
   return (
     <View style={styles.wrap}>
       {options.map((o) => {
@@ -46,31 +49,32 @@ export default function SegmentedControl<T extends string>({
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: {
-    flexDirection: 'row',
-    backgroundColor: colors.line,
-    borderRadius: radius.sm,
-    padding: 3,
-  },
-  segment: {
-    flex: 1,
-    paddingVertical: 7,
-    borderRadius: radius.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 44,
-  },
-  segmentActive: {
-    backgroundColor: colors.card,
-    ...cardShadow,
-  },
-  text: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.muted,
-  },
-  textActive: {
-    color: colors.text,
-  },
-});
+const makeStyles = (colors: ThemeColors, isDark: boolean) =>
+  StyleSheet.create({
+    wrap: {
+      flexDirection: 'row',
+      backgroundColor: colors.line,
+      borderRadius: radius.sm,
+      padding: 3,
+    },
+    segment: {
+      flex: 1,
+      paddingVertical: 7,
+      borderRadius: radius.sm,
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: 44,
+    },
+    segmentActive: {
+      backgroundColor: colors.card,
+      ...(isDark ? {} : cardShadowLight),
+    },
+    text: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.muted,
+    },
+    textActive: {
+      color: colors.text,
+    },
+  });

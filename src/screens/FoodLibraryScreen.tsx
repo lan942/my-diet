@@ -13,7 +13,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
-import { cardShadow, colors, macroColors, radius, spacing, typeScale } from '../theme';
+import { cardShadowLight, macroColors, radius, spacing, typeScale, type ThemeColors } from '../theme';
+import { useTheme } from '../theme/ThemeContext';
 import { useApp } from '../state/AppContext';
 import { t, tError, type TranslationKey } from '../i18n';
 import {
@@ -42,7 +43,7 @@ import Toast, { useToast } from '../components/Toast';
 type FormMode = 'hidden' | 'add' | 'edit';
 
 // 分类语义色：蛋白蓝 / 脂肪金 / 碳水绿 / 纤维绿 / 抗氧化珊瑚红（Modern & Premium 语义色体系）
-function catColor(kind: CatKind | null): string {
+function catColor(colors: ThemeColors, kind: CatKind | null): string {
   switch (kind) {
     case 'protein':
       return macroColors.protein;
@@ -58,15 +59,17 @@ function catColor(kind: CatKind | null): string {
   }
 }
 
-const TAG_COLORS: Record<FoodTagKey, string> = {
-  highProtein: macroColors.protein,
-  healthyFats: macroColors.fat,
-  complexCarb: macroColors.carb,
-  highFiber: macroColors.carb,
-  antioxidant: macroColors.calorie,
-  zeroCarb: macroColors.carb,
-  lowGi: colors.ok,
-};
+function tagColors(colors: ThemeColors): Record<FoodTagKey, string> {
+  return {
+    highProtein: macroColors.protein,
+    healthyFats: macroColors.fat,
+    complexCarb: macroColors.carb,
+    highFiber: macroColors.carb,
+    antioxidant: macroColors.calorie,
+    zeroCarb: macroColors.carb,
+    lowGi: colors.ok,
+  };
+}
 
 const TAG_KEYS: Record<FoodTagKey, TranslationKey> = {
   highProtein: 'food.tag.highProtein',
@@ -79,6 +82,8 @@ const TAG_KEYS: Record<FoodTagKey, TranslationKey> = {
 };
 
 export default function FoodLibraryScreen() {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
   const { categories, foodItems, refresh } = useApp();
   const [query, setQuery] = useState('');
   const [selectedCat, setSelectedCat] = useState<number | null>(null);
@@ -323,9 +328,9 @@ export default function FoodLibraryScreen() {
             filtered.map((item) => {
               const kind = catKindById.get(item.category_id) ?? null;
               const tags = foodTags(item, kind);
-              const barColor = catColor(kind);
+              const barColor = catColor(colors, kind);
               return (
-                <View key={item.id} style={[styles.foodCard, cardShadow]}>
+                <View key={item.id} style={[styles.foodCard, isDark ? {} : cardShadowLight]}>
                   <View style={[styles.cardBar, { backgroundColor: barColor }]} />
                   <View style={styles.cardBody}>
                     <View style={styles.nameRow}>
@@ -352,7 +357,7 @@ export default function FoodLibraryScreen() {
                     {tags.length > 0 && (
                       <View style={styles.tagRow}>
                         {tags.map((tag) => {
-                          const color = TAG_COLORS[tag];
+                          const color = tagColors(colors)[tag];
                           return (
                             <View
                               key={tag}
@@ -507,6 +512,8 @@ function LabeledField({
   onChangeText: (v: string) => void;
   numeric?: boolean;
 }) {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
   return (
     <View style={styles.field}>
       <Text style={styles.fieldLabel} maxFontSizeMultiplier={1.4}>
@@ -523,7 +530,7 @@ function LabeledField({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bg,
@@ -544,7 +551,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 2,
     minHeight: 48,
-    ...cardShadow,
+    ...(isDark ? {} : cardShadowLight),
     marginBottom: spacing.sm,
   },
   searchInput: {

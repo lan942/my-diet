@@ -36,6 +36,7 @@ describe('configStore.validateConfig', () => {
       fat_ratio: 0.3,
       onboarded: true,
       unit_system: 'metric',
+      theme_preference: 'system',
     };
     expect(() => validateConfig(cfg)).not.toThrow();
   });

@@ -1,10 +1,11 @@
 // 轻提示 Toast：Animated 淡入淡出 + 1.8s 自动消失（非阻塞反馈，替代系统 Alert）
 // useToast() 返回状态与触发函数，<Toast> 负责渲染（position absolute，需在页面根容器内）
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Text, StyleSheet } from 'react-native';
 
-import { colors, radius, spacing } from '../theme';
+import { radius, spacing, type ThemeColors } from '../theme';
+import { useTheme } from '../theme/ThemeContext';
 
 export function useToast(): {
   toast: string;
@@ -52,6 +53,8 @@ export default function Toast({
   message: string;
   opacity: Animated.Value;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   if (!message) return null;
   return (
     <Animated.View style={[styles.toast, { opacity }]} pointerEvents="none">
@@ -62,19 +65,20 @@ export default function Toast({
   );
 }
 
-const styles = StyleSheet.create({
-  toast: {
-    position: 'absolute',
-    bottom: 96,
-    alignSelf: 'center',
-    backgroundColor: colors.text,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.pill,
-  },
-  toastText: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    toast: {
+      position: 'absolute',
+      bottom: 96,
+      alignSelf: 'center',
+      backgroundColor: colors.text,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.sm,
+      borderRadius: radius.pill,
+    },
+    toastText: {
+      color: colors.bg,
+      fontSize: 13,
+      fontWeight: '600',
+    },
+  });

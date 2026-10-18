@@ -22,7 +22,8 @@ import GoalPresetCards from '../components/onboarding/GoalPresetCards';
 import BodyMetricsRulers from '../components/onboarding/BodyMetricsRulers';
 import GenderOptionCards from '../components/onboarding/GenderOptionCards';
 import ActivityLevelRows from '../components/onboarding/ActivityLevelRows';
-import { cardShadow, colors, macroColors, radius, spacing, typeScale } from '../theme';
+import { cardShadowLight, macroColors, radius, spacing, typeScale, type ThemeColors } from '../theme';
+import { useTheme } from '../theme/ThemeContext';
 import { useApp } from '../state/AppContext';
 import { t, tError, formatNumber, type TranslationKey } from '../i18n';
 import {
@@ -39,7 +40,7 @@ import {
   resetEverything,
 } from '../services/dataService';
 import { kgToLb, cmToFtIn } from '../services/unit';
-import type { Gender, UnitSystem } from '../types';
+import type { Gender, ThemePreference, UnitSystem } from '../types';
 
 type SheetKind = 'goal' | 'body' | 'gender' | 'activity';
 
@@ -71,6 +72,8 @@ function ratioApproxEqual(a: number, b: number) {
 }
 
 export default function ProfileScreen() {
+  const { colors, isDark, preference, setPreference } = useTheme();
+  const styles = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
   const { config, refresh, saveAndRefreshConfig } = useApp();
 
   const [sheet, setSheet] = useState<SheetKind | null>(null);
@@ -203,6 +206,12 @@ export default function ProfileScreen() {
     }
   }
 
+  function changeTheme(next: ThemePreference) {
+    if (next === preference) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setPreference(next);
+  }
+
   function handleExport() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setAction('export');
@@ -282,7 +291,7 @@ export default function ProfileScreen() {
           {t('settings.section.preferencesData')}
         </Text>
 
-        <View style={[styles.prefsCard, cardShadow]}>
+        <View style={[styles.prefsCard, isDark ? {} : cardShadowLight]}>
           {/* 单位行：标题与分段控件上下堆叠，保证两个选项在窄屏也单行不换行 */}
           <View style={styles.unitBlock}>
             <View style={styles.unitHead}>
@@ -299,6 +308,27 @@ export default function ProfileScreen() {
                 ]}
                 value={config?.unit_system ?? 'metric'}
                 onChange={changeUnit}
+              />
+            </View>
+          </View>
+
+          {/* 外观行：跟随系统/浅色/深色，与单位行同布局 */}
+          <View style={styles.unitBlock}>
+            <View style={styles.unitHead}>
+              <Ionicons name="contrast-outline" size={20} color={colors.text} />
+              <Text style={[styles.prefTitle, styles.unitHeadTitle]} maxFontSizeMultiplier={1.4}>
+                {t('theme.title')}
+              </Text>
+            </View>
+            <View style={styles.unitSeg}>
+              <SegmentedControl<ThemePreference>
+                options={[
+                  { label: t('theme.followSystem'), value: 'system' },
+                  { label: t('theme.light'), value: 'light' },
+                  { label: t('theme.dark'), value: 'dark' },
+                ]}
+                value={preference}
+                onChange={changeTheme}
               />
             </View>
           </View>
@@ -517,8 +547,10 @@ function SummaryCard({
   onEdit: () => void;
   children: React.ReactNode;
 }) {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
   return (
-    <View style={[styles.summaryCard, cardShadow]}>
+    <View style={[styles.summaryCard, isDark ? {} : cardShadowLight]}>
       <View style={[styles.cardBar, { backgroundColor: accent }]} />
       <View style={styles.cardBody}>
         <View style={styles.cardTitleRow}>
@@ -560,6 +592,8 @@ function PrefsRow({
   danger?: boolean;
   onPress: () => void;
 }) {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
   const color = danger ? colors.danger : colors.text;
   return (
     <Pressable
@@ -582,7 +616,7 @@ function PrefsRow({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bg,

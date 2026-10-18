@@ -1,6 +1,6 @@
 // 水平刻度尺选择器：拖动选值，逐格触觉反馈，程序化滚动（单位切换）不误触发回调
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { colors } from '../theme';
+import { type ThemeColors } from '../theme';
+import { useTheme } from '../theme/ThemeContext';
 
 const TICK_W = 12;
 
@@ -37,6 +38,8 @@ export default function RulerPicker({
   onChange,
   formatValue,
 }: RulerPickerProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   // 实测滚动容器自身宽度（刻度尺全部处在带 padding/maxWidth 的父容器内，
   // 用 useWindowDimensions 的屏宽会让两侧居中内边距系统性偏大、pin 与刻度错位）
   const [viewW, setViewW] = useState(0);
@@ -152,72 +155,74 @@ export default function RulerPicker({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    paddingVertical: 12,
-    marginBottom: 12,
-  },
-  valueRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  iconChip: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: colors.accentSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  valueText: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: '#111827',
-    textAlign: 'center',
-  },
-  unitText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#6b7280',
-  },
-  rulerWrap: {
-    height: 48,
-    justifyContent: 'flex-end',
-  },
-  pin: {
-    position: 'absolute',
-    left: '50%',
-    top: 0,
-    bottom: 0,
-    width: 2,
-    marginLeft: -1,
-    backgroundColor: colors.accent,
-    borderRadius: 1,
-  },
-  tick: {
-    width: TICK_W,
-    alignItems: 'center',
-  },
-  tickMajor: {
-    width: 2,
-    height: 32,
-    backgroundColor: '#9ca3af',
-    borderRadius: 1,
-  },
-  tickMid: {
-    width: 1.5,
-    height: 22,
-    backgroundColor: '#c7ccd4',
-    borderRadius: 1,
-  },
-  tickMinor: {
-    width: 1,
-    height: 14,
-    backgroundColor: '#e3e6ea',
-    borderRadius: 1,
-  },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: {
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      paddingVertical: 12,
+      marginBottom: 12,
+    },
+    valueRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+    },
+    iconChip: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      backgroundColor: colors.accentSoft,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    valueText: {
+      fontSize: 26,
+      fontWeight: '700',
+      color: colors.text,
+      textAlign: 'center',
+    },
+    unitText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.muted,
+    },
+    rulerWrap: {
+      height: 48,
+      justifyContent: 'flex-end',
+    },
+    pin: {
+      position: 'absolute',
+      left: '50%',
+      top: 0,
+      bottom: 0,
+      width: 2,
+      marginLeft: -1,
+      backgroundColor: colors.accent,
+      borderRadius: 1,
+    },
+    tick: {
+      width: TICK_W,
+      alignItems: 'center',
+    },
+    tickMajor: {
+      width: 2,
+      height: 32,
+      backgroundColor: colors.muted,
+      borderRadius: 1,
+    },
+    tickMid: {
+      width: 1.5,
+      height: 22,
+      backgroundColor: colors.line,
+      borderRadius: 1,
+    },
+    tickMinor: {
+      width: 1,
+      height: 14,
+      backgroundColor: colors.line,
+      borderRadius: 1,
+      opacity: 0.6,
+    },
+  });

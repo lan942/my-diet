@@ -1,7 +1,7 @@
 // 通用底部操作抽屉：选项选择（导出格式）与二次确认（导入/清空数据）
 // 视觉与 EditSheet 一致：grabber + 居中标题 + 说明 + 选项行/主按钮 + 取消
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Modal,
   View,
@@ -16,7 +16,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
 import { Button } from './ui';
-import { colors, spacing } from '../theme';
+import { spacing, type ThemeColors } from '../theme';
+import { useTheme } from '../theme/ThemeContext';
 import { t } from '../i18n';
 
 export interface ActionSheetOption {
@@ -93,6 +94,8 @@ export default function ActionSheet({
   onClose,
 }: ActionSheetProps) {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   // Animated.Value 与 PanResponder 为稳定实例，用 useState 惰性初始化（规避 render 期访问 ref）
   const [translateY] = useState(() => new Animated.Value(0));
   const [sheetPan] = useState(() => createSheetPanResponder(translateY, onClose));
@@ -200,83 +203,84 @@ export default function ActionSheet({
   );
 }
 
-const styles = StyleSheet.create({
-  mask: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    backgroundColor: colors.card,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingTop: spacing.sm,
-    paddingHorizontal: spacing.xl,
-    maxHeight: '88%',
-  },
-  grabber: {
-    alignSelf: 'center',
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.line,
-    marginBottom: spacing.md,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.text,
-    textAlign: 'center',
-  },
-  message: {
-    fontSize: 13,
-    color: colors.muted,
-    textAlign: 'center',
-    marginTop: spacing.xs,
-    marginBottom: spacing.sm,
-    lineHeight: 18,
-  },
-  option: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.bg,
-    borderRadius: 16,
-    padding: spacing.md,
-    marginTop: spacing.sm,
-  },
-  optionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.md,
-  },
-  optionBody: {
-    flex: 1,
-    marginRight: spacing.sm,
-  },
-  optionLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  optionSub: {
-    fontSize: 12,
-    color: colors.muted,
-    marginTop: 2,
-  },
-  confirmWrap: {
-    marginTop: spacing.md,
-  },
-  cancel: {
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    marginTop: spacing.xs,
-  },
-  cancelText: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: colors.muted,
-  },
-});
+const makeStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    mask: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.35)',
+      justifyContent: 'flex-end',
+    },
+    sheet: {
+      backgroundColor: colors.card,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      paddingTop: spacing.sm,
+      paddingHorizontal: spacing.xl,
+      maxHeight: '88%',
+    },
+    grabber: {
+      alignSelf: 'center',
+      width: 36,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.line,
+      marginBottom: spacing.md,
+    },
+    title: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: colors.text,
+      textAlign: 'center',
+    },
+    message: {
+      fontSize: 13,
+      color: colors.muted,
+      textAlign: 'center',
+      marginTop: spacing.xs,
+      marginBottom: spacing.sm,
+      lineHeight: 18,
+    },
+    option: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.bg,
+      borderRadius: 16,
+      padding: spacing.md,
+      marginTop: spacing.sm,
+    },
+    optionIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: spacing.md,
+    },
+    optionBody: {
+      flex: 1,
+      marginRight: spacing.sm,
+    },
+    optionLabel: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    optionSub: {
+      fontSize: 12,
+      color: colors.muted,
+      marginTop: 2,
+    },
+    confirmWrap: {
+      marginTop: spacing.md,
+    },
+    cancel: {
+      alignItems: 'center',
+      paddingVertical: spacing.md,
+      marginTop: spacing.xs,
+    },
+    cancelText: {
+      fontSize: 15,
+      fontWeight: '500',
+      color: colors.muted,
+    },
+  });

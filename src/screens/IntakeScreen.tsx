@@ -18,7 +18,8 @@ import Toast, { useToast } from '../components/Toast';
 import DateBar from '../components/DateBar';
 import ProgressBar from '../components/ProgressBar';
 import ActionSheet from '../components/ActionSheet';
-import { colors, spacing, macroColors, typeScale } from '../theme';
+import { spacing, macroColors, typeScale, type ThemeColors } from '../theme';
+import { useTheme } from '../theme/ThemeContext';
 import { useApp } from '../state/AppContext';
 import { t, tError, formatNumber, type TranslationKey } from '../i18n';
 import {
@@ -56,6 +57,8 @@ function mealLabelText(value: string): string {
 }
 
 export default function IntakeScreen() {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
   const {
     config,
     foodItems,
@@ -485,7 +488,7 @@ export default function IntakeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bg,

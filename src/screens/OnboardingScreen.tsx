@@ -20,7 +20,8 @@ import BodyMetricsRulers from '../components/onboarding/BodyMetricsRulers';
 import GenderOptionCards from '../components/onboarding/GenderOptionCards';
 import ActivityLevelRows from '../components/onboarding/ActivityLevelRows';
 import { Button } from '../components/ui';
-import { colors, spacing, macroColors, cardShadow } from '../theme';
+import { spacing, macroColors, cardShadowLight, type ThemeColors } from '../theme';
+import { useTheme } from '../theme/ThemeContext';
 import { useApp } from '../state/AppContext';
 import { t, tError, type TranslationKey } from '../i18n';
 import { computeTarget, type GoalPreset } from '../services/targetService';
@@ -41,6 +42,8 @@ const STEP_HINTS: TranslationKey[] = [
 ];
 
 export default function OnboardingScreen() {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
   const { saveAndRefreshConfig } = useApp();
   const insets = useSafeAreaInsets();
 
@@ -97,6 +100,7 @@ export default function OnboardingScreen() {
         fat_ratio: goal.fat,
         onboarded: true,
         unit_system: unit,
+        theme_preference: 'system',
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       setShowDone(false);
@@ -264,7 +268,7 @@ export default function OnboardingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bg,
@@ -273,7 +277,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
     backgroundColor: colors.card,
-    ...cardShadow,
+    ...(isDark ? {} : cardShadowLight),
   },
   progressRow: {
     flexDirection: 'row',

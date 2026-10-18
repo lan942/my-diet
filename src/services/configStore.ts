@@ -18,6 +18,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   fat_ratio: 0.25,
   onboarded: false,
   unit_system: 'metric',
+  theme_preference: 'system',
 };
 
 const ACTIVITY_FACTORS = ACTIVITY_LEVELS.map((l) => l.factor);
@@ -72,6 +73,10 @@ export function normalizeConfig(raw: Partial<AppConfig> | null): AppConfig {
       : DEFAULT_CONFIG.fat_ratio,
     onboarded: raw?.onboarded === true,
     unit_system: raw?.unit_system === 'us' ? 'us' : DEFAULT_CONFIG.unit_system,
+    theme_preference:
+      raw?.theme_preference === 'light' || raw?.theme_preference === 'dark'
+        ? raw.theme_preference
+        : DEFAULT_CONFIG.theme_preference,
   };
   return merged;
 }

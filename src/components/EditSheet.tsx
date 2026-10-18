@@ -1,7 +1,7 @@
 // 单步编辑抽屉（Bottom Sheet）：grabber + 标题 + 说明 + 内容 + Save
 // 手势下拉关闭（作用于头部区域，不与内容 ScrollView 冲突）+ 遮罩点击关闭
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Modal,
   View,
@@ -15,7 +15,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from './ui';
-import { colors, spacing } from '../theme';
+import { spacing, type ThemeColors } from '../theme';
+import { useTheme } from '../theme/ThemeContext';
 import { t } from '../i18n';
 
 interface EditSheetProps {
@@ -41,6 +42,8 @@ export default function EditSheet({
   onSave,
   children,
 }: EditSheetProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   // Animated.Value 与 PanResponder 为稳定实例，用 useState 惰性初始化（规避 render 期访问 ref）
   const [translateY] = useState(() => new Animated.Value(0));
@@ -130,7 +133,7 @@ export default function EditSheet({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   mask: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.35)',

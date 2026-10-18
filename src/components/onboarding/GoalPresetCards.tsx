@@ -1,11 +1,12 @@
 // 目标模板卡列表（受控组件）：首启引导第 1 步与「我的」Goal 编辑抽屉共用
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
-import { colors, spacing, macroColors, cardShadow } from '../../theme';
+import { spacing, macroColors, cardShadowLight, type ThemeColors } from '../../theme';
+import { useTheme } from '../../theme/ThemeContext';
 import { t } from '../../i18n';
 import { GOAL_PRESETS, type GoalPreset } from '../../services/targetService';
 
@@ -15,6 +16,8 @@ interface GoalPresetCardsProps {
 }
 
 export default function GoalPresetCards({ value, onChange }: GoalPresetCardsProps) {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
   return (
     <View>
       {GOAL_PRESETS.map((p) => {
@@ -24,7 +27,7 @@ export default function GoalPresetCards({ value, onChange }: GoalPresetCardsProp
             key={p.label}
             style={[
               styles.goalCard,
-              cardShadow,
+              isDark ? {} : cardShadowLight,
               active && { borderColor: p.color, backgroundColor: p.color },
             ]}
             onPress={() => {
@@ -80,7 +83,7 @@ export default function GoalPresetCards({ value, onChange }: GoalPresetCardsProp
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   goalCard: {
     flexDirection: 'row',
     alignItems: 'center',

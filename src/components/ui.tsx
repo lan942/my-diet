@@ -1,6 +1,6 @@
 // 通用 UI 组件：Button、TextInput、Row、EmptyState
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,8 @@ import {
   Pressable,
   StyleSheet,
 } from 'react-native';
-import { colors, radius, spacing, typeScale } from '../theme';
+import { radius, spacing, typeScale, type ThemeColors } from '../theme';
+import { useTheme } from '../theme/ThemeContext';
 
 interface ButtonProps {
   title: string;
@@ -23,6 +24,8 @@ export function Button({
   variant = 'primary',
   disabled,
 }: ButtonProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const bg =
     variant === 'primary'
       ? colors.accent
@@ -71,6 +74,8 @@ export function TextField({
   keyboardType = 'default',
   editable = true,
 }: TextFieldProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.field}>
       {label ? (
@@ -99,6 +104,8 @@ export function Row({
   left: React.ReactNode;
   right?: React.ReactNode;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.row}>
       <View style={styles.rowLeft}>{left}</View>
@@ -108,6 +115,8 @@ export function Row({
 }
 
 export function EmptyState({ text }: { text: string }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.empty}>
       <Text style={styles.emptyText} maxFontSizeMultiplier={1.4}>
@@ -117,7 +126,7 @@ export function EmptyState({ text }: { text: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   button: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
