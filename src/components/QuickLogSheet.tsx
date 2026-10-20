@@ -11,6 +11,7 @@ import {
   StyleSheet,
   Animated,
   PanResponder,
+  Keyboard,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -21,11 +22,9 @@ import { Button } from './ui';
 import { spacing, macroColors, type ThemeColors } from '../theme';
 import { useTheme } from '../theme/ThemeContext';
 import { t, tError } from '../i18n';
-import { defaultMealFor, scaleNutrition } from '../services/intakeService';
+import { defaultMealFor, scaleNutrition, parseCustomGrams, resolvePortionPrefill, normalizeMealValue, type MealValue } from '../services/intakeService';
 import { foodDisplayName, foodPortionLabel } from '../services/foodService';
-import type { FoodItem } from '../types';
-
-type MealValue = 'breakfast' | 'lunch' | 'dinner' | 'snack';
+import type { FoodItem, IntakeLog } from '../types';
 
 const GRAM_PRESETS = [50, 100, 150, 200];
 
@@ -34,6 +33,8 @@ interface QuickLogSheetProps {
   food: FoodItem | null;
   onClose: () => void;
   onAdd: (grams: number, meal: string) => Promise<void>;
+  // 编辑态：传入既有记录时按编辑语义预填与渲染（标题/按钮文案切换）；null 为新增态
+  editingLog?: IntakeLog | null;
 }
 
 const CLOSE_THRESHOLD = 120;
@@ -72,6 +73,7 @@ export default function QuickLogSheet({
   food,
   onClose,
   onAdd,
+  editingLog = null,
 }: QuickLogSheetProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -136,17 +138,18 @@ export default function QuickLogSheet({
           <View {...panResponder.panHandlers}>
             <View style={styles.grabber} />
             <Text style={styles.title} maxFontSizeMultiplier={1.4}>
-              {t('food.quickLogTitle')}
+              {editingLog ? t('intake.editTitle') : t('food.quickLogTitle')}
             </Text>
             <Text style={styles.hint} maxFontSizeMultiplier={1.4}>
-              {t('food.quickLogHint')}
+              {editingLog ? t('intake.editHint') : t('food.quickLogHint')}
             </Text>
           </View>
 
           {food !== null && (
             <QuickLogBody
-              key={food.id}
+              key={editingLog ? `edit-${editingLog.id}` : food.id}
               food={food}
+              editingLog={editingLog}
               onClose={onClose}
               onAdd={handleAddLocked}
               busy={busy}
@@ -158,14 +161,17 @@ export default function QuickLogSheet({
   );
 }
 
-// 内容：双模式份量（生活化份量 ⇄ 精确克数）+ 餐次分段 + 实时营养预览 + Add to Today
+// 内容：双模式份量（生活化份量 ⇄ 精确克数）+ 餐次分段 + 实时营养预览 + 提交
+// 编辑态（editingLog 非空）：预填当前克数/餐次，克数可反解份量时落到份量模式
 function QuickLogBody({
   food,
+  editingLog,
   onClose,
   onAdd,
   busy,
 }: {
   food: FoodItem;
+  editingLog: IntakeLog | null;
   onClose: () => void;
   onAdd: (grams: number, meal: string) => Promise<void>;
   busy: boolean;
@@ -174,11 +180,19 @@ function QuickLogBody({
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const portions = food.portions;
   const hasPortions = !!portions && portions.length > 0;
-  const [mode, setMode] = useState<'portions' | 'grams'>(() => (hasPortions ? 'portions' : 'grams'));
-  const [portionIdx, setPortionIdx] = useState(0);
-  const [qty, setQty] = useState(1);
-  const [grams, setGrams] = useState(100);
-  const [meal, setMeal] = useState<MealValue>(() => defaultMealFor(new Date()));
+  // 编辑态份量反解：仅计算一次（组件 keyed by 记录/食物 id，打开即重挂载）
+  const [prefill] = useState(() =>
+    editingLog ? resolvePortionPrefill(portions, editingLog.grams) : null
+  );
+  const [mode, setMode] = useState<'portions' | 'grams'>(() =>
+    editingLog ? (prefill ? 'portions' : 'grams') : hasPortions ? 'portions' : 'grams'
+  );
+  const [portionIdx, setPortionIdx] = useState(() => prefill?.anchorIdx ?? 0);
+  const [qty, setQty] = useState(() => prefill?.qty ?? 1);
+  const [grams, setGrams] = useState(() => editingLog?.grams ?? 100);
+  const [meal, setMeal] = useState<MealValue>(() =>
+    editingLog ? normalizeMealValue(editingLog.meal) : defaultMealFor(new Date())
+  );
   const [error, setError] = useState('');
 
   // 渲染期构造，跟随当前语言（禁止模块顶层调用 t() 固化文案）
@@ -192,15 +206,34 @@ function QuickLogBody({
   const portion = hasPortions ? portions![Math.min(portionIdx, portions!.length - 1)] : null;
   const effectiveGrams = mode === 'portions' && portion ? Math.round(qty * portion.grams) : grams;
 
+  // 渲染期同步最新有效克数到 ref：手动输入未失焦直接点提交时，dismiss 引发的 blur 提交会
+  // 触发 setGrams 重渲染，但正在执行的 handleAdd 闭包仍持旧值，必须经 ref 读取最新结果
+  const effectiveGramsRef = useRef(effectiveGrams);
+  effectiveGramsRef.current = effectiveGrams;
+  // 手动输入最近一次校验结果：非法输入中止提交（保留抽屉展示错误），合法输入清除标记
+  const gramsInputInvalidRef = useRef(false);
+  // 提交入口锁：busy 由外层在 onAdd 调用时才置位，dismiss 等待窗口需本地锁防重复提交
+  const submittingRef = useRef(false);
+
   async function handleAdd() {
-    if (busy) return;
+    if (busy || submittingRef.current) return;
+    submittingRef.current = true;
     setError('');
     try {
-      await onAdd(effectiveGrams, meal);
+      // 手动输入克数且未失焦时：先收键盘让 onBlur 提交输入，等一帧确保 ref 已同步新值
+      if (mode === 'grams' && Keyboard.isVisible()) {
+        Keyboard.dismiss();
+        await new Promise((r) => setTimeout(r, 60));
+        // 未失焦的输入非法：中止提交，保留抽屉展示错误（避免按旧值静默写入）
+        if (gramsInputInvalidRef.current) return;
+      }
+      await onAdd(effectiveGramsRef.current, meal);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       onClose();
     } catch (e: unknown) {
       setError(tError(e));
+    } finally {
+      submittingRef.current = false;
     }
   }
 
@@ -212,6 +245,20 @@ function QuickLogBody({
   function pickPortion(i: number) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setPortionIdx(i);
+  }
+
+  // 手动输入克数提交：非法输入提示并保留上次有效值（标记供 handleAdd 中止提交），
+  // 合法则写回（刻度尺按既有 clamp 吸附显示）
+  function commitGramsInput(raw: string) {
+    const parsed = parseCustomGrams(raw);
+    if (parsed === null) {
+      gramsInputInvalidRef.current = true;
+      setError(t('food.gramsInvalid'));
+      return;
+    }
+    gramsInputInvalidRef.current = false;
+    setError('');
+    setGrams(parsed);
   }
 
   const preview = scaleNutrition(food, effectiveGrams);
@@ -300,16 +347,22 @@ function QuickLogBody({
             ))}
           </View>
 
-          {/* 份量刻度尺（拖动逐格触觉反馈） */}
+          {/* 份量刻度尺（拖动逐格触觉反馈，点击数值可直接输入任意克数） */}
           <RulerPicker
             min={10}
-            max={500}
+            max={2000}
             step={10}
             value={grams}
             unit="g"
             icon="scale-outline"
             onChange={setGrams}
+            onValueInput={commitGramsInput}
+            // 显示层不做量程钳制：手动输入 1–9g 等越界值时数值如实显示，仅尺身 pin 吸附边界
+            formatValue={() => String(grams)}
           />
+          <Text style={styles.editTip} maxFontSizeMultiplier={1.4}>
+            {t('food.gramsEditHint')}
+          </Text>
         </>
       )}
 
@@ -364,7 +417,13 @@ function QuickLogBody({
       ) : null}
 
       <Button
-        title={busy ? t('onboarding.saving') : t('food.addToToday')}
+        title={
+          busy
+            ? t('onboarding.saving')
+            : editingLog
+              ? t('intake.saveEdit')
+              : t('food.addToToday')
+        }
         onPress={handleAdd}
         disabled={busy}
       />
@@ -462,6 +521,13 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: macroColors.calorie,
+    textAlign: 'center',
+    marginTop: -4,
+    marginBottom: spacing.sm,
+  },
+  editTip: {
+    fontSize: 12,
+    color: colors.muted,
     textAlign: 'center',
     marginTop: -4,
     marginBottom: spacing.sm,

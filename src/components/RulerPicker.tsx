@@ -4,6 +4,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
+  TextInput,
+  Pressable,
   ScrollView,
   StyleSheet,
   type NativeSyntheticEvent,
@@ -26,6 +28,9 @@ interface RulerPickerProps {
   icon?: keyof typeof Ionicons.glyphMap;
   onChange: (v: number) => void;
   formatValue?: (v: number) => string;
+  // 数值行直接编辑：提供后点击数值切换为数字键盘输入，失焦/提交时回调原始字符串
+  // （校验与写回由父组件负责；本组件只管理编辑态与数字字符过滤）
+  onValueInput?: (raw: string) => void;
 }
 
 export default function RulerPicker({
@@ -37,12 +42,15 @@ export default function RulerPicker({
   icon,
   onChange,
   formatValue,
+  onValueInput,
 }: RulerPickerProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   // 实测滚动容器自身宽度（刻度尺全部处在带 padding/maxWidth 的父容器内，
   // 用 useWindowDimensions 的屏宽会让两侧居中内边距系统性偏大、pin 与刻度错位）
   const [viewW, setViewW] = useState(0);
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState('');
   const sidePad = viewW > 0 ? (viewW - TICK_W) / 2 : 0;
   const count = Math.round((max - min) / step) + 1;
   const scrollRef = useRef<ScrollView>(null);
@@ -111,6 +119,29 @@ export default function RulerPicker({
 
   const display = formatValue ? formatValue(clampedValue) : `${clampedValue}`;
 
+  // 编辑文本最新值用 ref 同步：点击 Add to Today 时 onPress 先于 onBlur 触发，
+  // commitEdit 若读 state 闭包会拿到旧值，导致手动输入的克数丢失（写回编辑前值）
+  const editTextRef = useRef('');
+  // done 键会先触发 onSubmitEditing 再触发 onBlur，用已提交标记保证只回调一次
+  const committedRef = useRef(false);
+
+  // 进入直接编辑：预填当前值，数字键盘（快速记录场景避免弹全键盘）
+  function startEdit() {
+    committedRef.current = false;
+    editTextRef.current = String(value);
+    setEditText(editTextRef.current);
+    setEditing(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  }
+
+  // 提交编辑：无论是否合法都退出编辑态，合法性交由父组件校验（非法时父组件回退显示值）
+  function commitEdit() {
+    if (committedRef.current) return;
+    committedRef.current = true;
+    setEditing(false);
+    onValueInput?.(editTextRef.current);
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.valueRow}>
@@ -119,13 +150,41 @@ export default function RulerPicker({
             <Ionicons name={icon} size={15} color={colors.accent} />
           </View>
         ) : null}
-        <Text style={styles.valueText} maxFontSizeMultiplier={2}>
-          {display}
-          <Text style={styles.unitText} maxFontSizeMultiplier={1.4}>
-            {' '}
-            {unit}
-          </Text>
-        </Text>
+        {onValueInput && editing ? (
+          <TextInput
+            style={styles.valueInput}
+            value={editText}
+            onChangeText={(s) => {
+              const digits = s.replace(/[^0-9]/g, '');
+              editTextRef.current = digits;
+              setEditText(digits);
+            }}
+            keyboardType="number-pad"
+            returnKeyType="done"
+            autoFocus
+            selectTextOnFocus
+            onBlur={commitEdit}
+            onSubmitEditing={commitEdit}
+            maxLength={7}
+            numberOfLines={1}
+            maxFontSizeMultiplier={1.4}
+            accessibilityLabel={unit}
+          />
+        ) : (
+          <Pressable
+            onPress={onValueInput ? startEdit : undefined}
+            disabled={!onValueInput}
+            accessibilityRole={onValueInput ? 'button' : 'text'}
+          >
+            <Text style={styles.valueText} maxFontSizeMultiplier={2}>
+              {display}
+              <Text style={styles.unitText} maxFontSizeMultiplier={1.4}>
+                {' '}
+                {unit}
+              </Text>
+            </Text>
+          </Pressable>
+        )}
       </View>
       <View style={styles.rulerWrap}>
         <View style={styles.pin} />
@@ -182,6 +241,18 @@ const makeStyles = (colors: ThemeColors) =>
       fontWeight: '700',
       color: colors.text,
       textAlign: 'center',
+    },
+    // 直接编辑输入框：与 valueText 同字号字重，仅加底线提示可编辑
+    valueInput: {
+      fontSize: 26,
+      fontWeight: '700',
+      color: colors.text,
+      textAlign: 'center',
+      minWidth: 96,
+      paddingVertical: 0,
+      paddingHorizontal: 4,
+      borderBottomWidth: 1.5,
+      borderBottomColor: colors.accent,
     },
     unitText: {
       fontSize: 13,

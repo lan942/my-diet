@@ -22,7 +22,7 @@ import {
   canonicalCatKind,
 } from '../src/services/foodService';
 import { getDb } from '../src/db/database';
-import { defaultMealFor, scaleNutrition } from '../src/services/intakeService';
+import { defaultMealFor, scaleNutrition, parseCustomGrams } from '../src/services/intakeService';
 import type { FoodItem } from '../src/types';
 
 const mockedGetDb = vi.mocked(getDb);
@@ -416,6 +416,33 @@ describe('Quick Log 纯逻辑', () => {
     expect(scaled.kcal).toBeCloseTo(389, 2);
     expect(scaled.protein).toBeCloseTo(16.9, 2);
   });
+
+  it('scaleNutrition 支持任意克数（手动输入场景）', () => {
+    const chicken = {
+      kcal_per_100g: 165,
+      protein_per_100g: 31,
+      carb_per_100g: 0,
+      fat_per_100g: 3.6,
+    };
+    const scaled = scaleNutrition(chicken, 37);
+    expect(scaled.kcal).toBeCloseTo(61.05, 2);
+    expect(scaled.protein).toBeCloseTo(11.47, 2);
+  });
+
+  it('parseCustomGrams 接受 1–2000 正整数', () => {
+    expect(parseCustomGrams('1')).toBe(1);
+    expect(parseCustomGrams('37')).toBe(37);
+    expect(parseCustomGrams('235')).toBe(235);
+    expect(parseCustomGrams('2000')).toBe(2000);
+    expect(parseCustomGrams(' 100 ')).toBe(100);
+  });
+
+  it.each(['', '   ', '0', '-5', 'abc', '12.5', '1e3', '2001', '99999', '50g'])(
+    'parseCustomGrams 拒绝非法输入 %s → null',
+    (raw) => {
+      expect(parseCustomGrams(raw)).toBeNull();
+    }
+  );
 });
 
 // 升级补齐：mock db（getAllAsync 按表名分流；runAsync 捕获 INSERT，并按真实

@@ -20,6 +20,7 @@ import DateBar from '../components/DateBar';
 import ProgressBar from '../components/ProgressBar';
 import ActionSheet from '../components/ActionSheet';
 import EditSheet from '../components/EditSheet';
+import QuickLogSheet from '../components/QuickLogSheet';
 import { spacing, macroColors, typeScale, type ThemeColors } from '../theme';
 import { useTheme } from '../theme/ThemeContext';
 import { useApp } from '../state/AppContext';
@@ -27,8 +28,10 @@ import { t, tError, formatNumber, type TranslationKey } from '../i18n';
 import {
   createIntake,
   deleteIntake,
+  updateIntake,
   scaleNutrition,
   summarizeDaily,
+  LEGACY_MEAL_VALUES,
 } from '../services/intakeService';
 import { computeTarget } from '../services/targetService';
 import { computeEnergyBalance } from '../services/energyBalance';
@@ -39,7 +42,7 @@ import {
 } from '../services/stepService';
 import { useDeviceSteps } from '../hooks/useDeviceSteps';
 import { foodDisplayName, isLowGI } from '../services/foodService';
-import type { DailyNutrition, TargetResult } from '../types';
+import type { DailyNutrition, IntakeLog, TargetResult } from '../types';
 
 // 餐次：存储值固定为英文枚举（新数据 locale 无关）；旧数据中的中文值经映射兼容显示
 const MEALS: { value: string; key: TranslationKey }[] = [
@@ -48,13 +51,6 @@ const MEALS: { value: string; key: TranslationKey }[] = [
   { value: 'dinner', key: 'meal.dinner' },
   { value: 'snack', key: 'meal.snack' },
 ];
-
-const LEGACY_MEAL_VALUES: Record<string, string> = {
-  早餐: 'breakfast',
-  午餐: 'lunch',
-  晚餐: 'dinner',
-  加餐: 'snack',
-};
 
 // 餐次显示文案：合法/旧值映射到翻译；未知值原样展示（不再静默兜底成午餐）
 function mealLabelText(value: string): string {
@@ -105,6 +101,8 @@ export default function IntakeScreen() {
   const [saving, setSaving] = useState(false);
   // 待删除记录（ActionSheet 二次确认，禁用系统 Alert）
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  // 待编辑记录（QuickLogSheet 编辑态；null = 关闭）
+  const [editingLog, setEditingLog] = useState<IntakeLog | null>(null);
   // 步数手动录入抽屉（EditSheet，禁用系统 Alert）
   const [showStepsEdit, setShowStepsEdit] = useState(false);
   const [stepsInput, setStepsInput] = useState('');
@@ -210,6 +208,7 @@ export default function IntakeScreen() {
     setShowStepsEdit(false);
     setStepsInput('');
     setStepsError('');
+    setEditingLog(null);
   }
 
   const logsWithNames = useMemo(() => {
@@ -260,6 +259,23 @@ export default function IntakeScreen() {
       showToast(t('common.deleteFailed'));
     }
   }
+
+  // 编辑提交：服务层校验/更新失败会抛回抽屉展示；refresh 失败不抛出（更新已落库，避免用户重试误导）
+  async function handleEditSave(newGrams: number, newMeal: string) {
+    if (!editingLog) return;
+    await updateIntake(editingLog.id, { grams: newGrams, meal: newMeal });
+    try {
+      await refresh();
+    } catch {
+      // 记录已更新，列表将在下次加载时刷新
+    }
+    showToast(t('intake.editSavedToast'));
+  }
+
+  // 编辑目标食物：孤儿行无编辑入口，此处必有值（抽屉对 null 也做了兜底）
+  const editingFood = editingLog
+    ? (foodItems.find((f) => f.id === editingLog.food_item_id) ?? null)
+    : null;
 
   const selectedFood = foodItems.find((f) => f.id === selectedFoodId);
 
@@ -570,14 +586,30 @@ export default function IntakeScreen() {
                     </View>
                   }
                   right={
-                    <Pressable
-                      onPress={() => setDeleteId(l.id)}
-                      accessibilityRole="button"
-                      accessibilityLabel={`${t('common.delete')} ${l.food ? foodDisplayName(l.food) : t('intake.deletedFood')}`}
-                      style={styles.iconButton}
-                    >
-                      <Ionicons name="trash-outline" size={18} color={colors.danger} />
-                    </Pressable>
+                    <View style={styles.logActions}>
+                      {/* 编辑入口：孤儿行（食物已删除）不提供编辑，仅保留删除 */}
+                      {l.food ? (
+                        <Pressable
+                          onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                            setEditingLog(l);
+                          }}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${t('intake.editLog')} ${foodDisplayName(l.food)}`}
+                          style={styles.editLogButton}
+                        >
+                          <Ionicons name="pencil" size={17} color={macroColors.calorie} />
+                        </Pressable>
+                      ) : null}
+                      <Pressable
+                        onPress={() => setDeleteId(l.id)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${t('common.delete')} ${l.food ? foodDisplayName(l.food) : t('intake.deletedFood')}`}
+                        style={styles.iconButton}
+                      >
+                        <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                      </Pressable>
+                    </View>
                   }
                 />
               );
@@ -598,6 +630,15 @@ export default function IntakeScreen() {
         confirmDanger
         onConfirm={handleDeleteConfirm}
         onClose={() => setDeleteId(null)}
+      />
+
+      {/* 摄入记录编辑抽屉（复用 Quick Log 双模式交互，预填当前克数/餐次） */}
+      <QuickLogSheet
+        visible={editingLog !== null}
+        food={editingFood}
+        editingLog={editingLog}
+        onClose={() => setEditingLog(null)}
+        onAdd={handleEditSave}
       />
 
       {/* 步数手动录入（自定义编辑抽屉：保存/清除手动值，禁系统 Alert） */}
@@ -715,6 +756,19 @@ const makeStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 22,
     backgroundColor: '#fbefee',
+  },
+  logActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  editLogButton: {
+    width: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 22,
+    backgroundColor: colors.accentSoft,
   },
   stepsHint: {
     fontSize: 12,
