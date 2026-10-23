@@ -206,10 +206,12 @@ function QuickLogBody({
   const portion = hasPortions ? portions![Math.min(portionIdx, portions!.length - 1)] : null;
   const effectiveGrams = mode === 'portions' && portion ? Math.round(qty * portion.grams) : grams;
 
-  // 渲染期同步最新有效克数到 ref：手动输入未失焦直接点提交时，dismiss 引发的 blur 提交会
+  // 最新有效克数经 effect 同步到 ref：手动输入未失焦直接点提交时，dismiss 引发的 blur 提交会
   // 触发 setGrams 重渲染，但正在执行的 handleAdd 闭包仍持旧值，必须经 ref 读取最新结果
   const effectiveGramsRef = useRef(effectiveGrams);
-  effectiveGramsRef.current = effectiveGrams;
+  useEffect(() => {
+    effectiveGramsRef.current = effectiveGrams;
+  }, [effectiveGrams]);
   // 手动输入最近一次校验结果：非法输入中止提交（保留抽屉展示错误），合法输入清除标记
   const gramsInputInvalidRef = useRef(false);
   // 提交入口锁：busy 由外层在 onAdd 调用时才置位，dismiss 等待窗口需本地锁防重复提交

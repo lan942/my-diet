@@ -90,7 +90,7 @@ export default function EditSheet({
     >
       <View style={styles.mask}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        {/* 键盘弹出时抬高抽屉：iOS padding / Android height（窗口已缩放时偏移为零） */}
+        {/* 键盘弹出时抬高抽屉：adjustResize 下窗口已压缩，KAV height/padding 均可正常工作 */}
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.avoid}
@@ -120,6 +120,7 @@ export default function EditSheet({
             style={styles.body}
             contentContainerStyle={styles.bodyContent}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
             bounces={false}
           >
             {children}
@@ -160,7 +161,9 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     borderTopRightRadius: 24,
     paddingTop: spacing.sm,
     paddingHorizontal: spacing.xl,
-    maxHeight: '88%',
+    // maxHeight 相对 KAV 容器（adjustResize 下已含键盘压缩），100% 保证抽屉最多撑满可见区，
+    // 内容区自然被压缩为可滚动状态，保存按钮恒在键盘上方
+    maxHeight: '100%',
   },
   grabber: {
     alignSelf: 'center',
