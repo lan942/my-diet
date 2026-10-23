@@ -12,6 +12,7 @@ import {
   Animated,
   PanResponder,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -49,6 +50,14 @@ export default function EditSheet({
   const insets = useSafeAreaInsets();
   // Animated.Value 与 PanResponder 为稳定实例，用 useState 惰性初始化（规避 render 期访问 ref）
   const [translateY] = useState(() => new Animated.Value(0));
+  // 实测键盘高度（Android Modal 避让用；iOS 保留 KAV padding 平滑行为，不消费该值）
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', (e) => setKeyboardHeight(e.endCoordinates.height));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
 
   // 关闭动画期间复位偏移，避免下次打开残留
   useEffect(() => {
@@ -90,9 +99,10 @@ export default function EditSheet({
     >
       <View style={styles.mask}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        {/* 键盘弹出时抬高抽屉：adjustResize 下窗口已压缩，KAV height/padding 均可正常工作 */}
+        {/* iOS 用 KAV padding 平滑避让；Android Modal 是独立 window 不随主 Activity resize，
+            KAV 测不到键盘，改为实测键盘高度给 sheet 加 marginBottom 抬出键盘区 */}
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.avoid}
           pointerEvents="box-none"
         >
@@ -100,6 +110,7 @@ export default function EditSheet({
             style={[
               styles.sheet,
               { paddingBottom: spacing.xl + 8 + insets.bottom },
+              Platform.OS === 'android' ? { marginBottom: keyboardHeight } : null,
               { transform: [{ translateY }] },
             ]}
           >
@@ -161,9 +172,9 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     borderTopRightRadius: 24,
     paddingTop: spacing.sm,
     paddingHorizontal: spacing.xl,
-    // maxHeight 相对 KAV 容器（adjustResize 下已含键盘压缩），100% 保证抽屉最多撑满可见区，
-    // 内容区自然被压缩为可滚动状态，保存按钮恒在键盘上方
-    maxHeight: '100%',
+    // 相对 KAV 容器（Modal 内固定全屏高）的 88%：键盘弹出时由 marginBottom 抬升，
+    // sheet 高度不变、内容区 ScrollView 自然可滚到被遮字段
+    maxHeight: '88%',
   },
   grabber: {
     alignSelf: 'center',
